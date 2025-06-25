@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda Deportiva</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #262626;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Estilizar la barra de desplazamiento */
+        ::-webkit-scrollbar {
+            width: 8px;
+            background-color: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #333333;
+            border-radius: 4px;
+        }
+
+        .header-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 69px;
+            background-color: #262626;
+            z-index: 1000;
+            border-bottom: 1px solid #404040;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .search-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 1rem;
+            max-width: 64rem;
+            width: 100%;
+            position: relative;
+        }
+
+        .clear-button {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            display: none;
+            color: #6b7280;
+            background: none;
+            border: none;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            z-index: 2;
+        }
+
+        .clear-button:hover {
+            color: #9ca3af;
+        }
+
+        .clear-button svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .clear-button.visible {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .search-input-container {
+            position: relative;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input-container::before {
+            content: '';
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z' /%3E%3C/svg%3E");
+            background-size: contain;
+            background-repeat: no-repeat;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        input {
+            background-color: #262626;
+            border: 1px solid #404040;
+            color: white;
+            padding-left: 40px !important;
+            padding-right: 40px !important;
+            width: 100%;
+            height: 38px; /* Altura específica para el input */
+        }
+
+        input::placeholder {
+            color: #6b7280;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #525252;
+            ring: 2px solid #525252;
+        }
+
+        #events-container {
+            margin-top: 89px; /* 69px del header + 20px de espacio */
+            padding: 0 1rem 1rem 1rem; /* Agregado padding-bottom de 1rem */
+            max-width: 64rem;
+            margin-left: auto;
+            margin-right: auto;
+            padding-bottom: 1rem; /* Agregado para coincidir con el espacio entre eventos */
+        }
+
+        .status-live {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            background-color: #dc2626;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .status-upcoming {
+            background-color: #6b7280;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .status-finished {
+            background-color: #000000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333333;
+            border-left-color: #ffffff;
+            border-radius: 50%;
+            display: inline-block;
+            position: relative;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .event-card {
+            background-color: #333333;
+            border: 1px solid #404040;
+        }
+        .btn {
+            background-color: #404040;
+            color: white;
+            transition: all 0.3s ease;
+            position: relative;
+            min-width: 100px;
+        }
+        
+        .btn:hover {
+            background-color: #4a4a4a;
+        }
+        
+        .btn.copied {
+            animation: copySuccess 1s ease;
+        }
+        
+        @keyframes copySuccess {
+            0%, 100% { background-color: #404040; }
+            50% { background-color: #22c55e; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-container">
+        <div class="search-container">
+            <div class="search-input-container">
+                <input type="text" 
+                       id="search" 
+                       class="flex-grow rounded-md px-3 py-2 text-sm" 
+                       placeholder="Buscar eventos...">
+                <button class="clear-button" id="clear-search">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <button id="refresh-button" class="px-4 py-2 rounded-md btn whitespace-nowrap flex items-center justify-center">
+                Actualizar
+            </button>
+        </div>
+    </div>
+
+    <div id="events-container" class="space-y-4">
+        <div class="flex items-center justify-center">
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+
+    <script>
+        let allEvents = [];
+
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    button.classList.add('copied');
+                    setTimeout(() => {
+                        button.classList.remove('copied');
+                    }, 1000);
+                })
+                .catch(err => console.error('Error al copiar:', err));
+        }
+
+        function createEventCard(event) {
+            let statusClass = '';
+            switch(event.status.toLowerCase()) {
+                case 'en vivo':
+                    statusClass = 'status-live';
+                    break;
+                case 'finalizado':
+                    statusClass = 'status-finished';
+                    break;
+                default:
+                    statusClass = 'status-upcoming';
+            }
+
+            function getButtonText(link) {
+                try {
+                    const url = new URL(link);
+                    const streamParam = url.searchParams.get('stream');
+                    return streamParam ? streamParam.toUpperCase() : 'OPCIÓN';
+                } catch {
+                    return 'OPCIÓN';
+                }
+            }
+            
+            return `
+                <div class="event-card rounded-lg p-4">
+                    <div class="flex flex-col space-y-4">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white uppercase ${statusClass}">
+                                    ${event.status}
+                                </span>
+                                <span class="text-sm text-gray-300">${event.time}</span>
+                            </div>
+                            <h2 class="text-xl font-semibold text-white">${event.title}</h2>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            ${event.options.map((link) => `
+                                <button onclick="copyToClipboard('${link}', this)"
+                                        class="btn px-4 py-2 rounded-md text-sm">
+                                    ${getButtonText(link)}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function filterEvents() {
+            const searchTerm = document.getElementById('search').value.toLowerCase();
+            const filteredEvents = allEvents.filter(event => 
+                event.title.toLowerCase().includes(searchTerm)
+            );
+
+            document.getElementById('events-container').innerHTML = 
+                filteredEvents.length > 0 
+                    ? filteredEvents.map(createEventCard).join('')
+                    : '<p class="text-center text-gray-400">No se encontraron eventos</p>';
+        }
+
+        async function loadEvents() {
+            document.getElementById('events-container').innerHTML = '<div class="flex items-center justify-center"><div class="loading-spinner"></div></div>';
+
+            try {
+                const response = await fetch('/api/events');
+                if (!response.ok) throw new Error('Error al obtener eventos');
+                
+                allEvents = await response.json();
+                filterEvents();
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('events-container').innerHTML = 
+                    '<p class="text-center text-red-500">Error al cargar los eventos. Intenta de nuevo.</p>';
+            }
+        }
+
+        function toggleClearButton() {
+            const searchInput = document.getElementById('search');
+            const clearButton = document.getElementById('clear-search');
+            clearButton.classList.toggle('visible', searchInput.value.length > 0);
+        }
+
+        function clearSearch() {
+            const searchInput = document.getElementById('search');
+            searchInput.value = '';
+            toggleClearButton();
+            filterEvents();
+        }
+
+        document.getElementById('search').addEventListener('input', () => {
+            filterEvents();
+            toggleClearButton();
+        });
+        
+        document.getElementById('clear-search').addEventListener('click', clearSearch);
+        document.getElementById('refresh-button').addEventListener('click', loadEvents);
+        document.addEventListener('DOMContentLoaded', loadEvents);
+    </script>
+</body>
+</html>
