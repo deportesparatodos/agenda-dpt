@@ -9,8 +9,7 @@
   "scripts": {
     "dev": "vercel dev",
     "build": "echo 'No build step needed'",
-    "start": "vercel dev",
-    "postinstall": "puppeteer browsers install chrome"
+    "start": "vercel dev"
   },
   "dependencies": {
     "puppeteer": "^22.15.0",
