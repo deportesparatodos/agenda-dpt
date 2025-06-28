@@ -3,17 +3,18 @@
   "functions": {
     "api/*.js": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 30
     }
   },
-  "routes": [
+  "headers": [
     {
-      "src": "/api/events",
-      "dest": "/api/events.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=300, stale-while-revalidate=600"
+        }
+      ]
     }
   ]
 }

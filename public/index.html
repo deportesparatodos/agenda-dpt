@@ -215,6 +215,140 @@
     </div>
 
     <script>
+        // Mapeo agrupado de canales (igual que en events.js)
+        const channelsGrouped = {
+            'ESPN': ['espn-b', 'espn-c', 'espn-a', 'espn-d', 'espn1'],
+            'ESPN 2': ['espn2-a', 'espn2-b', 'espn2-c', 'espn2-d', 'espn2'],
+            'ESPN 3': ['espn3-a', 'espn3-b', 'espn3-c', 'espn3-d', 'espn3'],
+            'ESPN 4': ['espn4-a', 'espn4-b', 'espn4-c', 'espn4-d', 'espn4'],
+            'ESPN 5': ['espn5-a', 'espn5-b', 'espn5-c', 'espn5-d', 'espn5'],
+            'ESPN 6': ['espn6-a', 'espn6-b', 'espn6-c', 'espn6-d', 'espn6'],
+            'ESPN 7': ['espn7-a', 'espn7-b', 'espn7-c', 'espn7-d', 'espn7'],
+            'ESPN PREMIUM': ['espn-premium-a', 'espn-premium-b', 'espn-premium-c', 'espn-premium-d', 'espnpremium'],
+            'TNT SPORTS': ['tnt-a', 'tnt-b', 'tnt-c', 'tnt-d', 'tntsports'],
+            'TYC SPORTS': ['tyc-a', 'tyc-b', 'tyc-c', 'tyc-d'],
+            'FOX SPORTS': ['fox-a', 'fox-b', 'fox-c', 'fox-d', 'foxsports'],
+            'FOX SPORTS 2': ['fox2-a', 'fox2-b', 'fox2-c', 'fox2-d', 'foxsports2'],
+            'FOX SPORTS 3': ['fox3-a', 'fox3-b', 'fox3-c', 'fox3-d', 'foxsports3'],
+            'DIRECTV SPORTS': ['dtv-a', 'dtv-b', 'dtv-c'],
+            'DIRECTV SPORTS 2': ['dtv2-a', 'dtv2-b', 'dtv2-c'],
+            'DIRECTV SPORTS PLUS': ['dtvplus-a', 'dtvplus-b', 'dtvplus-c'],
+            'TV PUBLICA': ['tvp-a', 'tvp-b', 'tvp-c', 'tvp-d'],
+            'TELEFE': ['telefe-a', 'telefe-b', 'telefe-c', 'telefe-d'],
+            'VTV URUGUAY': ['vtv-a', 'vtv-b', 'vtv-c', 'vtv-d'],
+            'VTV PLUS URUGUAY': ['vtvplus-a', 'vtvplus-b', 'vtvplus-c', 'vtvplus-d'],
+            'WINSPORTS': ['winsports-a', 'winsports-b'],
+            'WINSPORTS PLUS': ['winsportsplus-a', 'winsportsplus-b'],
+            'LIGA 1 MAX PERU': ['l1max-a', 'l1max-b'],
+            'GOL PERU': ['golperu'],
+            'LATINA PERU': ['latinape'],
+            'AMERICA TV PERU': ['americatvpe'],
+            'ATV PERU': ['atv'],
+            'CARACOL TV': ['caracoltv'],
+            'TIGO SPORTS PARAGUAY': ['tigosportspy-a', 'tigosportspy-b'],
+            'FOX SPORTS PREMIUM MX': ['foxsportspremium-a', 'foxsportspremium-b', 'foxsportspremium-c'],
+            'FOX SPORTS MEXICO': ['foxmx-a', 'foxmx-b', 'foxmx-c'],
+            'FOX SPORTS 2 MEXICO': ['foxmx2-a', 'foxmx2-b', 'foxmx2-c'],
+            'FOX SPORTS 3 MEXICO': ['foxmx3-a', 'foxmx3-b', 'foxmx3-c'],
+            'ESPN MEXICO': ['espnmx'],
+            'ESPN 2 MEXICO': ['espn2mx'],
+            'ESPN 3 MEXICO': ['espn3mx'],
+            'FORMULA 1': ['f1-a', 'f1-b'],
+            'DAZN FORMULA 1': ['daznf1', 'daznmgp'],
+            'INDYCAR': ['indycar', 'auftv'],
+            'INDYNXT': ['indynxt'],
+            'NASCAR CUP': ['cup', 'cup2'],
+            'RALLY': ['rally', 'rally2', 'rallytv'],
+            'SUPERFORMULA': ['superformula'],
+            'DAZN LA LIGA': ['daznlaliga'],
+            'DAZN 1 ESPAÑA': ['daznes1'],
+            'DAZN 2 ESPAÑA': ['daznes2'],
+            'DAZN 3 ESPAÑA': ['daznes3'],
+            'DAZN 4 ESPAÑA': ['daznes4'],
+            'BUNDESLIGA 1': ['bundesliga1'],
+            'BUNDESLIGA 2': ['bundesliga2'],
+            'BUNDESLIGA 3': ['bundesliga3'],
+            'BUNDESLIGA 4': ['bundesliga4'],
+            'BUNDESLIGA 5': ['bundesliga5'],
+            'SPORT TV 1 PORTUGAL': ['sporttv1'],
+            'SPORT TV 2 PORTUGAL': ['sporttv2'],
+            'SPORT TV 3 PORTUGAL': ['sporttv3'],
+            'SPORT TV 4 PORTUGAL': ['sporttv4'],
+            'SPORT TV 5 PORTUGAL': ['sporttv5'],
+            'SPORT TV 6 PORTUGAL': ['sporttv6'],
+            'TNT UK 1': ['tntuk'],
+            'TNT UK 2': ['tntuk2'],
+            'TNT UK 3': ['tntuk3'],
+            'TNT UK 4': ['tntuk4'],
+            'EUROSPORTS 1': ['eurosports1-a', 'eurosports1-b'],
+            'EUROSPORTS 2': ['eurosports2-a', 'eurosports2-b'],
+            'MLS 1': ['mls1'],
+            'MLS 2': ['mls2'],
+            'MLS 3': ['mls3'],
+            'MLS 4': ['mls4'],
+            'MLS 5': ['mls5'],
+            'MLS 6': ['mls6'],
+            'MLS 7': ['mls7'],
+            'MLS 8': ['mls8'],
+            'MLS 9': ['mls9'],
+            'MLS 10': ['mls10'],
+            'MLS 11': ['mls11'],
+            'MLS 12': ['mls12'],
+            'MLS 13': ['mls13'],
+            'MLS 14': ['mls14'],
+            'NBA 1': ['nba1-a', 'nba1-b'],
+            'NBA 2': ['nba2-a', 'nba2-b'],
+            'NBA 3': ['nba3-a', 'nba3-b'],
+            'NBA 4': ['nba4-a', 'nba4-b'],
+            'NBA 5': ['nba5-a', 'nba5-b'],
+            'NBA 6': ['nba6-a', 'nba6-b'],
+            'NBA 7': ['nba7-a', 'nba7-b'],
+            'NBA 8': ['nba8-a', 'nba8-b'],
+            'NBA 9': ['nba9-a', 'nba9-b'],
+            'NBA 10': ['nba10-a', 'nba10-b'],
+            'NBA 11': ['nba11-a', 'nba11-b'],
+            'NBA 12': ['nba12-a', 'nba12-b'],
+            'NBA 13': ['nba13-a', 'nba13-b'],
+            'NBA 14': ['nba14-a', 'nba14-b'],
+            'MLB 1': ['mlb1-a', 'mlb1-b'],
+            'MLB 2': ['mlb2-a', 'mlb2-b'],
+            'MLB 3': ['mlb3-a', 'mlb3-b'],
+            'MLB 4': ['mlb4-a', 'mlb4-b'],
+            'MLB 5': ['mlb5-a', 'mlb5-b'],
+            'MLB 6': ['mlb6-a', 'mlb6-b'],
+            'MLB 7': ['mlb7-a', 'mlb7-b'],
+            'MLB 8': ['mlb8-a', 'mlb8-b'],
+            'MLB 9': ['mlb9-a', 'mlb9-b'],
+            'MLB 10': ['mlb10-a', 'mlb10-b'],
+            'MLB 11': ['mlb11-a', 'mlb11-b'],
+            'MLB 12': ['mlb12-a', 'mlb12-b'],
+            'MLB 13': ['mlb13-a', 'mlb13-b'],
+            'MLB 14': ['mlb14-a', 'mlb14-b'],
+            'GRAN HERMANO 24HS': ['24hs'],
+            'GRAN HERMANO CAMARA 1': ['camara1'],
+            'GRAN HERMANO CAMARA 2': ['camara2'],
+            'GRAN HERMANO CAMARA 3': ['camara3'],
+            'GRAN HERMANO MULTICAM': ['ghmulticam'],
+            'DISNEY': ['disney1-a', 'disney1-b', 'disneyplus-1'],
+            'WWE': ['wwe'],
+            'USA NETWORK': ['usanetwork-a', 'usanetwork-b'],
+            'NETFLIX 1': ['netflix1'],
+            'NETFLIX 2': ['netflix2'],
+            'EVENTOS': ['eventos1','eventos2','eventos3','eventos4','eventos5','eventos6','eventos7','eventos8','eventos9','eventos10','eventos11','eventos12','eventos13','eventos14','eventos15', 'transmi1', 'transmi2', 'transmi3', 'transmi4', 'transmi5', 'transmi6', 'transmi7', 'transmi8', 'transmi9', 'transmi10', 'transmi11', 'transmi12', 'transmi13', 'transmi14', 'transmi15', 'transmi16', 'transmi17', 'transmi18', 'transmi19', 'transmi20', 'transmi21', 'transmi22', 'transmi23'],
+            'TRANSMISIONES ESPECIALES': ['especial', 'especial2'],
+            'MULTICAMARA': ['multicam', 'multi-f1', 'multi-2'],
+            'tv-1': ['tv1'],
+            'tv-2': ['tv2'],
+            'tv-3': ['tv3'],
+            'tv-4': ['tv4'],
+            'tv-5': ['tv5'],
+        };
+        // Mapeo invertido: value (canal) => key (nombre humano)
+        const channelValueToName = {};
+        for (const [key, values] of Object.entries(channelsGrouped)) {
+            values.forEach(val => channelValueToName[val] = key);
+        }
+
         let allEvents = [];
 
         function copyToClipboard(text, button) {
@@ -226,6 +360,24 @@
                     }, 1000);
                 })
                 .catch(err => console.error('Error al copiar:', err));
+        }
+
+        function getButtonText(link) {
+            try {
+                const url = new URL(link);
+                const channelParam = url.searchParams.get('channel');
+                if (channelParam) {
+                    if (channelValueToName[channelParam]) {
+                        return channelValueToName[channelParam];
+                    } else {
+                        return channelParam.toUpperCase();
+                    }
+                }
+                const streamParam = url.searchParams.get('stream');
+                return streamParam ? streamParam.toUpperCase() : 'OPCIÓN';
+            } catch {
+                return 'OPCIÓN';
+            }
         }
 
         function createEventCard(event) {
@@ -240,17 +392,6 @@
                 default:
                     statusClass = 'status-upcoming';
             }
-
-            function getButtonText(link) {
-                try {
-                    const url = new URL(link);
-                    const streamParam = url.searchParams.get('stream');
-                    return streamParam ? streamParam.toUpperCase() : 'OPCIÓN';
-                } catch {
-                    return 'OPCIÓN';
-                }
-            }
-            
             return `
                 <div class="event-card rounded-lg p-4">
                     <div class="flex flex-col space-y-4">

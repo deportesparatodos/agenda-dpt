@@ -12,13 +12,8 @@
     "start": "vercel dev"
   },
   "dependencies": {
-    "puppeteer": "^22.15.0",
     "node-fetch": "^3.3.2",
-    "cheerio": "^1.0.0-rc.12",
-    "puppeteer-core": "^22.15.0",
-    "@sparticuz/chromium": "^127.0.0" 
+    "cheerio": "^1.0.0-rc.12"
   },
-  "puppeteer": {
-    "default_browser": "chrome"
-  }
+  "devDependencies": {}
 }
