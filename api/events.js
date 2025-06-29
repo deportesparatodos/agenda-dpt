@@ -524,7 +524,7 @@ export default async (req, res) => {
                     time: event.time || '00:00',
                     title: event.title || 'Sin título',
                     options: [event.link],
-                    buttons: [event.button || 'CANAL'], // SIEMPRE array, aunque sea 1
+                    buttons: event.button ? [event.button] : [],
                     category: event.category || 'Sin categoría',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
@@ -532,9 +532,12 @@ export default async (req, res) => {
                 });
             } else {
                 if (event.link) {
-                    const group = eventMap.get(key);
-                    group.options.push(event.link);
-                    group.buttons.push(event.button || 'CANAL');
+                    eventMap.get(key).options.push(event.link);
+                    if (event.button) {
+                        eventMap.get(key).buttons.push(event.button);
+                    } else {
+                        eventMap.get(key).buttons.push('CANAL');
+                    }
                 }
             }
         });
@@ -542,13 +545,11 @@ export default async (req, res) => {
         // Alinear y corregir botones especiales
         const adaptedEvents = Array.from(eventMap.values()).map(event => {
             // Asegurar que buttons y options tengan la misma longitud
-            if (!Array.isArray(event.buttons)) event.buttons = [];
-            if (!Array.isArray(event.options)) event.options = [];
-            // Rellenar botones faltantes
+            if (!event.buttons) event.buttons = [];
             while (event.buttons.length < event.options.length) {
                 event.buttons.push('CANAL');
             }
-            // Forzar nombre de botón para links especiales
+            // Corregir textos especiales y nunca dejar 'OPCION' para los links especiales
             event.options.forEach((opt, idx) => {
                 if (opt === 'https://alangulotv.live/canal/multi-f1/') {
                     event.buttons[idx] = 'MULTICAM (ALANGULOTV)';
@@ -557,46 +558,7 @@ export default async (req, res) => {
                     event.buttons[idx] = 'TELEMETRIA OFICIAL';
                 }
             });
-            // Si algún botón es vacío, poner CANAL
-            event.buttons = event.buttons.map(btn => btn && btn.trim() ? btn : 'CANAL');
-            return event;
-        })
-        .sort((a, b) => {
-            // Primero: En vivo
-            if (a.status === 'En vivo' && b.status !== 'En vivo') return -1;
-            if (a.status !== 'En vivo' && b.status === 'En vivo') return 1;
-            // Segundo: Próximos (ordenados por horario)
-            if (a.status === 'Próximo' && b.status === 'Finalizado') return -1;
-            if (a.status === 'Finalizado' && b.status === 'Próximo') return 1;
-            // Dentro del mismo estado, ordenar por hora
-            const [hourA, minuteA] = a.time.split(':').map(Number);
-            const [hourB, minuteB] = b.time.split(':').map(Number);
-            const timeA = hourA * 60 + minuteA;
-            const timeB = hourB * 60 + minuteB;
-            if (timeA !== timeB) {
-                return timeA - timeB;
-            }
-            // Si tienen el mismo horario, ordenar alfabéticamente por título
-            return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
-        });
-
-        console.log(`Eventos finales procesados: ${adaptedEvents.length}`);
-        
-        // Log de estado de eventos para debugging
-        const statusCounts = adaptedEvents.reduce((acc, event) => {
-            acc[event.status] = (acc[event.status] || 0) + 1;
-            return acc;
-        }, {});
-        console.log('Estados de eventos:', statusCounts);
-        
-        return res.status(200).json(adaptedEvents);
-        
-    } catch (error) {
-        console.error('Error durante la obtención de eventos:', error);
-        return res.status(500).json({
-            error: 'Error al obtener los eventos',
-            message: error.message,
-            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
-    }
-};
+            // Si algún botón es 'OPCION', reemplazarlo por 'CANAL' salvo que sea especial
+            event.buttons = event.buttons.map((btn, idx) => {
+                if (!btn || btn.toUpperCase().includes('OPCION')) {
+                    if
