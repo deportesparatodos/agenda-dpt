@@ -497,7 +497,6 @@ export default async (req, res) => {
         
         // Procesar eventos: ajustar horarios y agrupar por título y hora
         const eventMap = new Map();
-        
         allEvents.forEach(event => {
             // Solo procesar eventos que tengan tiempo válido
             if (event.time) {
@@ -525,7 +524,7 @@ export default async (req, res) => {
                     time: event.time || '00:00',
                     title: event.title || 'Sin título',
                     options: [event.link],
-                    buttons: event.button ? [event.button] : undefined,
+                    buttons: [event.button || 'CANAL'], // SIEMPRE array, aunque sea 1
                     category: event.category || 'Sin categoría',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
@@ -533,65 +532,53 @@ export default async (req, res) => {
                 });
             } else {
                 if (event.link) {
-                    eventMap.get(key).options.push(event.link);
-                    if (event.button) {
-                        if (!eventMap.get(key).buttons) eventMap.get(key).buttons = [];
-                        eventMap.get(key).buttons.push(event.button);
-                    }
+                    const group = eventMap.get(key);
+                    group.options.push(event.link);
+                    group.buttons.push(event.button || 'CANAL');
                 }
             }
         });
-        
-        // Convertir el Map a array y ordenar correctamente
-        const adaptedEvents = Array.from(eventMap.values())
-            .map(event => {
-                // Forzar nombre de botón para links especiales
-                if (event.options && event.options.length > 0) {
-                    event.options = event.options.map((opt, idx) => {
-                        if (opt === 'https://alangulotv.live/canal/multi-f1/') {
-                            if (event.buttons && event.buttons.length > idx) event.buttons[idx] = 'MULTICAM (ALANGULOTV)';
-                        }
-                        if (opt === 'https://alangulo-dashboard-f1.vercel.app/') {
-                            if (event.buttons && event.buttons.length > idx) event.buttons[idx] = 'TELEMETRIA OFICIAL';
-                        }
-                        return opt;
-                    });
+
+        // Alinear y corregir botones especiales
+        const adaptedEvents = Array.from(eventMap.values()).map(event => {
+            // Asegurar que buttons y options tengan la misma longitud
+            if (!Array.isArray(event.buttons)) event.buttons = [];
+            if (!Array.isArray(event.options)) event.options = [];
+            // Rellenar botones faltantes
+            while (event.buttons.length < event.options.length) {
+                event.buttons.push('CANAL');
+            }
+            // Forzar nombre de botón para links especiales
+            event.options.forEach((opt, idx) => {
+                if (opt === 'https://alangulotv.live/canal/multi-f1/') {
+                    event.buttons[idx] = 'MULTICAM (ALANGULOTV)';
                 }
-                if (event.buttons && Array.isArray(event.buttons)) {
-                    // Filtrar botones que sean 'OPCION' o vacíos SOLO si hay otros válidos
-                    let validButtons = event.buttons.filter(btn => btn && !btn.toUpperCase().includes('OPCION'));
-                    if (validButtons.length > 0) {
-                        event.buttons = validButtons;
-                    } else {
-                        // Si todos son 'OPCION', inferir canal del título
-                        if (event.title && event.title !== 'Sin título') {
-                            const canalInferido = event.title.split('vs')[0].trim().toUpperCase();
-                            event.buttons = [canalInferido || 'CANAL'];
-                        } else {
-                            event.buttons = ['CANAL'];
-                        }
-                    }
+                if (opt === 'https://alangulo-dashboard-f1.vercel.app/') {
+                    event.buttons[idx] = 'TELEMETRIA OFICIAL';
                 }
-                return event;
-            })
-            .sort((a, b) => {
-                // Primero: En vivo
-                if (a.status === 'En vivo' && b.status !== 'En vivo') return -1;
-                if (a.status !== 'En vivo' && b.status === 'En vivo') return 1;
-                // Segundo: Próximos (ordenados por horario)
-                if (a.status === 'Próximo' && b.status === 'Finalizado') return -1;
-                if (a.status === 'Finalizado' && b.status === 'Próximo') return 1;
-                // Dentro del mismo estado, ordenar por hora
-                const [hourA, minuteA] = a.time.split(':').map(Number);
-                const [hourB, minuteB] = b.time.split(':').map(Number);
-                const timeA = hourA * 60 + minuteA;
-                const timeB = hourB * 60 + minuteB;
-                if (timeA !== timeB) {
-                    return timeA - timeB;
-                }
-                // Si tienen el mismo horario, ordenar alfabéticamente por título
-                return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
             });
+            // Si algún botón es vacío, poner CANAL
+            event.buttons = event.buttons.map(btn => btn && btn.trim() ? btn : 'CANAL');
+            return event;
+        })
+        .sort((a, b) => {
+            // Primero: En vivo
+            if (a.status === 'En vivo' && b.status !== 'En vivo') return -1;
+            if (a.status !== 'En vivo' && b.status === 'En vivo') return 1;
+            // Segundo: Próximos (ordenados por horario)
+            if (a.status === 'Próximo' && b.status === 'Finalizado') return -1;
+            if (a.status === 'Finalizado' && b.status === 'Próximo') return 1;
+            // Dentro del mismo estado, ordenar por hora
+            const [hourA, minuteA] = a.time.split(':').map(Number);
+            const [hourB, minuteB] = b.time.split(':').map(Number);
+            const timeA = hourA * 60 + minuteA;
+            const timeB = hourB * 60 + minuteB;
+            if (timeA !== timeB) {
+                return timeA - timeB;
+            }
+            // Si tienen el mismo horario, ordenar alfabéticamente por título
+            return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
+        });
 
         console.log(`Eventos finales procesados: ${adaptedEvents.length}`);
         
