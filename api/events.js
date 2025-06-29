@@ -284,13 +284,12 @@ async function fetchAlanGuloTVEvents() {
                         const href = $link.attr('href');
                         let buttonName = $link.text().trim();
                         if (!buttonName) buttonName = 'CANAL';
-                        let finalLink = href;
                         // Normalizar el texto del botón para comparación flexible
                         const normalizedButton = buttonName.replace(/\s+/g, '').toLowerCase();
-                        // CASO ESPECIAL: multif1
+                        let finalLink;
                         if (normalizedButton === 'multif1') {
                             finalLink = 'https://alangulotv.live/canal/multi-f1/';
-                        } else if (normalizedButton === 'telemetriaoficialdealanguloTV'.toLowerCase()) {
+                        } else if (normalizedButton === 'telemetriaoficialdealangulotv') {
                             finalLink = 'https://alangulo-dashboard-f1.vercel.app/';
                         } else {
                             // Si el href es /canal/xxx/ o https://alangulotv.live/canal/xxx/ extraer xxx y usarlo como key
