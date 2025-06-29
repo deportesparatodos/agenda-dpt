@@ -382,21 +382,18 @@
 
         function createEventCard(event) {
             let statusClass = '';
-            let statusText = event.status;
-            switch(event.status.toLowerCase()) {
-                case 'en vivo':
-                    statusClass = 'status-live';
-                    statusText = 'EN VIVO';
-                    break;
-                case 'finalizado':
-                    statusClass = 'status-finished';
-                    statusText = 'FINALIZADO';
-                    break;
-                case 'próximo':
-                case 'proximo':
-                default:
-                    statusClass = 'status-upcoming';
-                    statusText = 'PRONTO';
+            let statusText = '';
+            // Normalizar para evitar problemas de acentos y mayúsculas
+            const normalizedStatus = (event.status || '').toLowerCase().normalize('NFD').replace(/[ -]/g,"");
+            if (normalizedStatus === 'en vivo') {
+                statusClass = 'status-live';
+                statusText = 'EN VIVO';
+            } else if (normalizedStatus === 'finalizado') {
+                statusClass = 'status-finished';
+                statusText = 'FINALIZADO';
+            } else {
+                statusClass = 'status-upcoming';
+                statusText = 'PRONTO';
             }
             return `
                 <div class="event-card rounded-lg p-4">
