@@ -32,14 +32,17 @@ function determineEventStatus(eventTime, eventDate) {
 
         // Usar la fecha del evento si está disponible, si no, usar hoy
         let baseDate = eventDate || new Date().toISOString().split('T')[0];
-        // baseDate en formato 'YYYY-MM-DD'
         const [year, month, day] = baseDate.split('-').map(Number);
         const [eventHour, eventMinute] = eventTime.split(':').map(Number);
         if (isNaN(eventHour) || isNaN(eventMinute)) return 'Próximo';
 
         // Obtener la hora actual de Buenos Aires (UTC-3)
-        const nowUTC = new Date();
-        const nowBuenosAires = new Date(nowUTC.getTime() - (nowUTC.getTimezoneOffset() * 60000) - (3 * 60 * 60 * 1000));
+        const now = new Date();
+        // Buenos Aires está en UTC-3, pero Date() ya está en local, así que calculamos la diferencia con UTC
+        const utcOffset = now.getTimezoneOffset() / 60; // en horas
+        // Si el server está en UTC, utcOffset será 0. Si está en otra zona, se ajusta.
+        // Para obtener la hora de Buenos Aires:
+        const nowBuenosAires = new Date(now.getTime() + ((-3 - utcOffset) * 60 * 60 * 1000));
 
         // Crear objeto Date para el inicio del evento en Buenos Aires
         const eventStart = new Date(year, month - 1, day, eventHour, eventMinute, 0, 0);
