@@ -186,7 +186,6 @@ const channelsGrouped = {
     'tv-4': ['tv4'],
     'tv-5': ['tv5'],
     'VTVPLUS': ['vtvplus-a'],
-    'transmi-1': ['transmi1'],
 };
 
 function normalizeChannelName(name) {
@@ -292,6 +291,7 @@ async function fetchAlanGuloTVEvents() {
                         }
                         let channelKey = null;
                         if (canalKey) {
+                            // Buscar en el mapeo por fallback normalizado
                             for (const key in channelsGrouped) {
                                 if (normalizeChannelForFallback(key) === canalKey.toLowerCase()) {
                                     channelKey = channelsGrouped[key][0];
@@ -306,29 +306,11 @@ async function fetchAlanGuloTVEvents() {
                         if (/^disney\d+$/i.test(channelKey)) {
                             channelKey = channelKey + '-a';
                         }
-                        // Si el channelKey es mayor a 10 caracteres, usar el link original y el texto original
-                        if (channelKey.length > 10) {
-                            let absoluteHref = href;
-                            if (href && href.startsWith('/')) {
-                                absoluteHref = `https://alangulotv.live${href}`;
-                            }
-                            // Si el link termina con /ext/{canal}/, reemplazar por https://play.alangulotv.live/?channel={canal}
-                            const extMatch = absoluteHref.match(/\/ext\/([a-zA-Z0-9\-]+)\/$/);
-                            if (extMatch) {
-                                const canal = extMatch[1].replace(/-/g, '');
-                                absoluteHref = `https://play.alangulotv.live/?channel=${canal}`;
-                            }
-                            links.push({
-                                name: buttonName,
-                                url: absoluteHref
-                            });
-                        } else {
-                            finalLink = `https://play.alangulotv.live/?channel=${channelKey}`;
-                            links.push({
-                                name: buttonName,
-                                url: finalLink
-                            });
-                        }
+                        finalLink = `https://play.alangulotv.live/?channel=${channelKey}`;
+                        links.push({
+                            name: buttonName,
+                            url: finalLink
+                        });
                     });
                 }
                 
