@@ -186,6 +186,7 @@ const channelsGrouped = {
     'tv-4': ['tv4'],
     'tv-5': ['tv5'],
     'VTVPLUS': ['vtvplus-a'],
+    'transmi-1': ['transmi1'],
 };
 
 function normalizeChannelName(name) {
