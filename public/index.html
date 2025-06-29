@@ -473,7 +473,13 @@
                 else if (status === 'Próximo') proximo.push(event);
                 else finalizado.push(event);
             });
-            // Ordenar cada grupo por hora y título
+            // Quitar prefijo del título (todo hasta el primer ': ')
+            function quitarPrefijoTitulo(titulo) {
+                if (!titulo) return '';
+                const partes = titulo.split(': ');
+                return partes.length > 1 ? partes.slice(1).join(': ').trim() : titulo.trim();
+            }
+            // Ordenar cada grupo por hora y título ignorando prefijos
             function sortByTimeAndTitle(a, b) {
                 const [hourA, minuteA] = a.time.split(':').map(Number);
                 const [hourB, minuteB] = b.time.split(':').map(Number);
@@ -482,7 +488,9 @@
                 if (timeA !== timeB) {
                     return timeA - timeB;
                 }
-                return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
+                const tituloA = quitarPrefijoTitulo(a.title).toLowerCase();
+                const tituloB = quitarPrefijoTitulo(b.title).toLowerCase();
+                return tituloA.localeCompare(tituloB, 'es');
             }
             enVivo.sort(sortByTimeAndTitle);
             proximo.sort(sortByTimeAndTitle);
