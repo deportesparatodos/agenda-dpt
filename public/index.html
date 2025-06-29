@@ -410,13 +410,26 @@
         }
 
         function createEventCard(event) {
-            // Eliminamos el indicador de estado
+            const status = getEventStatus(event);
+            let statusClass = '';
+            let statusText = '';
+            if (status === 'EN VIVO') {
+                statusClass = 'status-live px-2 py-1 rounded text-xs font-bold ml-2';
+                statusText = 'EN VIVO';
+            } else if (status === 'PRONTO') {
+                statusClass = 'status-upcoming px-2 py-1 rounded text-xs font-bold ml-2';
+                statusText = 'PRONTO';
+            } else {
+                statusClass = 'status-finished px-2 py-1 rounded text-xs font-bold ml-2';
+                statusText = 'FINALIZADO';
+            }
             return `
                 <div class="event-card rounded-lg p-4">
                     <div class="flex flex-col space-y-4">
                         <div>
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="text-sm text-gray-300">${event.time}</span>
+                                <span class="${statusClass}">${statusText}</span>
                             </div>
                             <h2 class="text-xl font-semibold text-white">${event.title}</h2>
                         </div>
