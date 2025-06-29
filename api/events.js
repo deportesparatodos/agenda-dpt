@@ -283,6 +283,14 @@ async function fetchAlanGuloTVEvents() {
                         const href = $link.attr('href');
                         let buttonName = $link.text().trim();
                         if (!buttonName) buttonName = 'CANAL';
+                        // Si el nombre del botón es mayor a 10 caracteres, usar el link original y el texto tal cual
+                        if (buttonName.length > 10) {
+                            links.push({
+                                name: buttonName,
+                                url: href
+                            });
+                            return;
+                        }
                         let finalLink = href;
                         // Si el href es /canal/xxx/ o https://alangulotv.live/canal/xxx/ extraer xxx y usarlo como key
                         let canalKey = null;
