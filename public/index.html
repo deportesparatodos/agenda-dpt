@@ -382,18 +382,15 @@
 
         function createEventCard(event) {
             let statusClass = '';
-            let statusText = '';
-            // Normalizar para evitar problemas de acentos y mayúsculas
-            const normalizedStatus = (event.status || '').toLowerCase().normalize('NFD').replace(/[ -]/g,"");
-            if (normalizedStatus === 'en vivo') {
-                statusClass = 'status-live';
-                statusText = 'EN VIVO';
-            } else if (normalizedStatus === 'finalizado') {
-                statusClass = 'status-finished';
-                statusText = 'FINALIZADO';
-            } else {
-                statusClass = 'status-upcoming';
-                statusText = 'PRONTO';
+            switch(event.status.toLowerCase()) {
+                case 'en vivo':
+                    statusClass = 'status-live';
+                    break;
+                case 'finalizado':
+                    statusClass = 'status-finished';
+                    break;
+                default:
+                    statusClass = 'status-upcoming';
             }
             return `
                 <div class="event-card rounded-lg p-4">
@@ -401,7 +398,7 @@
                         <div>
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white uppercase ${statusClass}">
-                                    ${statusText}
+                                    ${event.status}
                                 </span>
                                 <span class="text-sm text-gray-300">${event.time}</span>
                             </div>
