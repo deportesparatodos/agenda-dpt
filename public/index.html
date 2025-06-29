@@ -451,12 +451,17 @@
                             <h2 class="text-xl font-semibold text-white">${event.title}</h2>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            ${event.options.map((link, i) => `
-                                <button onclick="copyToClipboard('${link}', this)"
+                            ${event.options.map((link, i) => {
+                                // Si el link es fox-a, forzar el texto FOX SPORTS
+                                const isFoxA = link === 'https://play.alangulotv.live/?channel=fox-a';
+                                const buttonText = isFoxA
+                                    ? getButtonText(link)
+                                    : (event.buttons && event.buttons[i]) ? event.buttons[i] : getButtonText(link);
+                                return `<button onclick="copyToClipboard('${link}', this)"
                                         class="btn px-4 py-2 rounded-md text-sm">
-                                    ${(event.buttons && event.buttons[i]) ? event.buttons[i] : getButtonText(link)}
-                                </button>
-                            `).join('')}
+                                    ${buttonText}
+                                </button>`;
+                            }).join('')}
                         </div>
                     </div>
                 </div>
