@@ -588,6 +588,26 @@ export default async (req, res) => {
                 }
                 return btn;
             });
+            // Indicador de estado (Buenos Aires UTC-3)
+            try {
+                const [hour, minute] = event.time.split(':').map(Number);
+                const eventDate = event.date || new Date().toISOString().split('T')[0];
+                // Crear fecha de inicio en Buenos Aires
+                const start = new Date(`${eventDate}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00-03:00`);
+                const now = new Date();
+                // Convertir now a Buenos Aires (UTC-3)
+                const nowBuenosAires = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+                const diffMs = nowBuenosAires - start;
+                if (diffMs < 0) {
+                    event.status = 'Próximo';
+                } else if (diffMs <= 3 * 60 * 60 * 1000) {
+                    event.status = 'En vivo';
+                } else {
+                    event.status = 'Finalizado';
+                }
+            } catch (e) {
+                event.status = undefined;
+            }
             return event;
         });
 
