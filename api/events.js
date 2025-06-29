@@ -25,33 +25,31 @@ function adjustTimeZone(time, date) {
     }
 }
 
-// Función para determinar si un evento está en vivo basado en la hora actual
+// Función para determinar si un evento está en vivo, próximo o finalizado usando la hora real de Buenos Aires
 function determineEventStatus(eventTime, eventDate) {
     try {
         if (!eventTime || eventTime === '00:00') return 'Próximo';
 
-        // Usar la fecha del evento si está disponible, si no, usar hoy
+        // Obtener la fecha base (YYYY-MM-DD)
         let baseDate = eventDate || new Date().toISOString().split('T')[0];
         const [year, month, day] = baseDate.split('-').map(Number);
         const [eventHour, eventMinute] = eventTime.split(':').map(Number);
         if (isNaN(eventHour) || isNaN(eventMinute)) return 'Próximo';
 
-        // Obtener la hora actual de Buenos Aires (UTC-3)
-        const now = new Date();
-        // Buenos Aires está en UTC-3, pero Date() ya está en local, así que calculamos la diferencia con UTC
-        const utcOffset = now.getTimezoneOffset() / 60; // en horas
-        // Si el server está en UTC, utcOffset será 0. Si está en otra zona, se ajusta.
-        // Para obtener la hora de Buenos Aires:
-        const nowBuenosAires = new Date(now.getTime() + ((-3 - utcOffset) * 60 * 60 * 1000));
+        // Obtener la hora actual de Buenos Aires (independiente de la zona del server)
+        // 1. Obtener la hora UTC actual
+        const nowUTC = new Date(Date.now());
+        // 2. Calcular la hora de Buenos Aires (UTC-3)
+        const nowBuenosAires = new Date(nowUTC.getTime() - (3 * 60 * 60 * 1000));
 
-        // Crear objeto Date para el inicio del evento en Buenos Aires
-        const eventStart = new Date(year, month - 1, day, eventHour, eventMinute, 0, 0);
-        // Crear objeto Date para el final (3h después)
-        const eventEnd = new Date(eventStart.getTime() + (180 * 60 * 1000));
+        // Crear objeto Date para el inicio del evento en Buenos Aires (en UTC)
+        const eventStartUTC = Date.UTC(year, month - 1, day, eventHour + 3, eventMinute, 0, 0); // +3 para llevarlo a UTC
+        const eventEndUTC = eventStartUTC + (3 * 60 * 60 * 1000); // 3 horas después
+        const nowUTCms = nowUTC.getTime();
 
-        if (nowBuenosAires >= eventStart && nowBuenosAires < eventEnd) {
+        if (nowUTCms >= eventStartUTC && nowUTCms < eventEndUTC) {
             return 'En vivo';
-        } else if (nowBuenosAires < eventStart) {
+        } else if (nowUTCms < eventStartUTC) {
             return 'Próximo';
         } else {
             return 'Finalizado';
