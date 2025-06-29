@@ -314,6 +314,8 @@ async function fetchAlanGuloTVEvents() {
                             finalLink = 'https://play.alangulotv.live/?channel=transmi1';
                         } else if (finalLink === 'https://play.alangulotv.live/?channel=foxsportsmx') {
                             finalLink = 'https://play.alangulotv.live/?channel=foxmx-a';
+                        } else if (finalLink === 'https://play.alangulotv.live/?channel=directv') {
+                            finalLink = 'https://play.alangulotv.live/?channel=dtv-a';
                         }
                         // REEMPLAZO FINAL SEGÚN TU PEDIDO
                         if (finalLink === 'https://play.alangulotv.live/?channel=telemetraoficialdealangulotv') {
