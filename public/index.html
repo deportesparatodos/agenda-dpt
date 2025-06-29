@@ -393,19 +393,17 @@
             const [year, month, day] = baseDate.split('-').map(Number);
             const [eventHour, eventMinute] = event.time.split(':').map(Number);
             if (isNaN(eventHour) || isNaN(eventMinute)) return 'PRONTO';
-            // Hora de inicio y fin del evento en Buenos Aires (en ms)
-            // Creamos la fecha del evento en Buenos Aires (local)
-            const eventStart = new Date(year, month - 1, day, eventHour, eventMinute, 0, 0);
-            // Obtenemos la hora actual de Buenos Aires
+            // Hora de inicio del evento en Buenos Aires (UTC-3)
+            const eventStartBA = new Date(Date.UTC(year, month - 1, day, eventHour + 3, eventMinute, 0, 0));
+            // Hora actual en Buenos Aires (UTC-3)
             const nowUTC = new Date();
             const nowBA = new Date(nowUTC.getTime() - (3 * 60 * 60 * 1000));
-            // Ajustamos la fecha del evento a la zona de Buenos Aires
-            const eventStartBA = new Date(Date.UTC(year, month - 1, day, eventHour + 3, eventMinute, 0, 0));
+            // Hora de fin del evento (3 horas después del inicio)
             const eventEndBA = new Date(eventStartBA.getTime() + 3 * 60 * 60 * 1000);
-            if (nowBA >= eventStartBA && nowBA < eventEndBA) {
-                return 'EN VIVO';
-            } else if (nowBA < eventStartBA) {
+            if (nowBA < eventStartBA) {
                 return 'PRONTO';
+            } else if (nowBA >= eventStartBA && nowBA < eventEndBA) {
+                return 'EN VIVO';
             } else {
                 return 'FINALIZADO';
             }
