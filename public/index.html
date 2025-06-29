@@ -437,10 +437,10 @@
                             <h2 class="text-xl font-semibold text-white">${event.title}</h2>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            ${event.options.map((link) => `
+                            ${event.options.map((link, i) => `
                                 <button onclick="copyToClipboard('${link}', this)"
                                         class="btn px-4 py-2 rounded-md text-sm">
-                                    ${getButtonText(link)}
+                                    ${(event.buttons && event.buttons[i]) ? event.buttons[i] : getButtonText(link)}
                                 </button>
                             `).join('')}
                         </div>

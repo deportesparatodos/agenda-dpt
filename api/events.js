@@ -317,6 +317,7 @@ async function fetchAlanGuloTVEvents() {
                             finalLink = 'https://alangulotv.live/canal/multi-f1/';
                             buttonName = 'MULTICAM (ALANGULOTV)';
                         }
+
                         // Si el link final es uno de los dos especiales, forzar el nombre del botón aunque sea 'OPCION'
                         if (finalLink === 'https://alangulotv.live/canal/multi-f1/') {
                             buttonName = 'MULTICAM (ALANGULOTV)';
