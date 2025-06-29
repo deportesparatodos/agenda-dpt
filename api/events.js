@@ -325,7 +325,6 @@ async function fetchAlanGuloTVEvents() {
                             category: 'Deportes',
                             language: 'Español',
                             date: new Date().toISOString().split('T')[0],
-                            status: 'Próximo', // Se actualizará después
                             source: 'alangulotv'
                         });
                     });
@@ -416,7 +415,6 @@ async function fetchAlanGuloTVFallback() {
                         category: 'Deportes',
                         language: 'Español',
                         date: new Date().toISOString().split('T')[0],
-                        status: 'Próximo', // Se actualizará después
                         source: 'alangulotv'
                     });
                 }
@@ -513,7 +511,6 @@ export default async (req, res) => {
                     category: event.category || 'Sin categoría',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
-                    status: null, // El frontend lo calculará
                     source: event.source || 'unknown'
                 });
             } else {
@@ -545,7 +542,6 @@ export default async (req, res) => {
                         }
                     }
                 }
-                event.status = null; // El frontend lo calculará
                 return event;
             })
             .sort((a, b) => {
