@@ -581,11 +581,9 @@ export default async (req, res) => {
                 // Primero: En vivo
                 if (a.status === 'En vivo' && b.status !== 'En vivo') return -1;
                 if (a.status !== 'En vivo' && b.status === 'En vivo') return 1;
-                
                 // Segundo: Próximos (ordenados por horario)
                 if (a.status === 'Próximo' && b.status === 'Finalizado') return -1;
                 if (a.status === 'Finalizado' && b.status === 'Próximo') return 1;
-                
                 // Dentro del mismo estado, ordenar por hora
                 const [hourA, minuteA] = a.time.split(':').map(Number);
                 const [hourB, minuteB] = b.time.split(':').map(Number);
