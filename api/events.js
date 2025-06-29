@@ -308,9 +308,13 @@ async function fetchAlanGuloTVEvents() {
                         }
                         // Si el channelKey es mayor a 10 caracteres, usar el link original y el texto original
                         if (channelKey.length > 10) {
+                            let absoluteHref = href;
+                            if (href && href.startsWith('/')) {
+                                absoluteHref = `https://alangulotv.live${href}`;
+                            }
                             links.push({
                                 name: buttonName,
-                                url: href
+                                url: absoluteHref
                             });
                         } else {
                             finalLink = `https://play.alangulotv.live/?channel=${channelKey}`;
