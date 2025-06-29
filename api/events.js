@@ -528,11 +528,21 @@ export default async (req, res) => {
             // El estado se calcula SIEMPRE usando la hora que se muestra (event.time ya ajustada)
             const key = `${event.title || 'Sin título'}__${event.time || '00:00'}__${event.source}`;
             if (!eventMap.has(key)) {
+                let buttonArr = [];
+                if (event.source === 'streamtpglobal' && event.link) {
+                    // Extraer el valor después del igual en el parámetro stream
+                    const match = event.link.match(/[?&]stream=([^&#]+)/i);
+                    buttonArr = [match ? match[1].toUpperCase() : 'CANAL'];
+                } else if (event.button) {
+                    buttonArr = [event.button];
+                } else {
+                    buttonArr = [];
+                }
                 eventMap.set(key, {
                     time: event.time || '00:00',
                     title: event.title || 'Sin título',
                     options: [event.link],
-                    buttons: event.button ? [event.button] : [],
+                    buttons: buttonArr,
                     category: event.category || 'Sin categoría',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
@@ -541,7 +551,10 @@ export default async (req, res) => {
             } else {
                 if (event.link) {
                     eventMap.get(key).options.push(event.link);
-                    if (event.button) {
+                    if (event.source === 'streamtpglobal') {
+                        const match = event.link.match(/[?&]stream=([^&#]+)/i);
+                        eventMap.get(key).buttons.push(match ? match[1].toUpperCase() : 'CANAL');
+                    } else if (event.button) {
                         eventMap.get(key).buttons.push(event.button);
                     } else {
                         eventMap.get(key).buttons.push('CANAL');
