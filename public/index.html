@@ -351,38 +351,38 @@
 
         let allEvents = [];
 
-        // Función para obtener la hora actual de Buenos Aires
+        // Función robusta para obtener la hora actual de Buenos Aires
         function getBuenosAiresTime() {
-            const now = new Date();
-            // UTC-3 (Buenos Aires)
-            const buenosAiresOffset = -3 * 60; // -3 horas en minutos
-            const localOffset = now.getTimezoneOffset(); // minutos
-            const buenosAiresTime = new Date(now.getTime() + (localOffset + buenosAiresOffset) * 60000);
-            return buenosAiresTime;
+            // Usar Intl.DateTimeFormat para obtener la fecha y hora exacta en Buenos Aires
+            const formatter = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/Argentina/Buenos_Aires',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            const parts = formatter.formatToParts(new Date());
+            const get = type => parts.find(p => p.type === type)?.value;
+            // Crear un objeto Date con los componentes de Buenos Aires
+            return new Date(
+                `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`
+            );
         }
 
         // Función para determinar el estado del evento en el frontend
         function determineEventStatus(eventTime, eventDate) {
             try {
                 if (!eventTime || eventTime === '00:00') return 'Próximo';
-
-                // Obtener la hora actual de Buenos Aires
                 const nowBuenosAires = getBuenosAiresTime();
-                
-                // Usar la fecha del evento si está disponible, si no, usar hoy
                 let baseDate = eventDate || new Date().toISOString().split('T')[0];
-                
-                // Crear la fecha del evento en Buenos Aires
                 const [year, month, day] = baseDate.split('-').map(Number);
                 const [eventHour, eventMinute] = eventTime.split(':').map(Number);
-                
                 if (isNaN(eventHour) || isNaN(eventMinute)) return 'Próximo';
-
-                // Crear objeto Date para el inicio del evento en Buenos Aires
                 const eventStart = new Date(year, month - 1, day, eventHour, eventMinute, 0, 0);
-                // Crear objeto Date para el final (3h después)
                 const eventEnd = new Date(eventStart.getTime() + (180 * 60 * 1000));
-
                 if (nowBuenosAires >= eventStart && nowBuenosAires < eventEnd) {
                     return 'En vivo';
                 } else if (nowBuenosAires < eventStart) {
