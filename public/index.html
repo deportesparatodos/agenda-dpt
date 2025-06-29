@@ -133,17 +133,17 @@
 
         .status-live {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-            background-color: #dc2626;
+            background-color: #dc2626; /* Rojo para EN VIVO */
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
         
         .status-upcoming {
-            background-color: #6b7280;
+            background-color: #6b7280; /* Gris para PRONTO */
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
         
         .status-finished {
-            background-color: #000000;
+            background-color: #000000; /* Negro para FINALIZADO */
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
 
@@ -353,7 +353,6 @@
 
         // Función robusta para obtener la hora actual de Buenos Aires
         function getBuenosAiresTime() {
-            // Usar Intl.DateTimeFormat para obtener la fecha y hora exacta en Buenos Aires
             const formatter = new Intl.DateTimeFormat('en-CA', {
                 timeZone: 'America/Argentina/Buenos_Aires',
                 year: 'numeric',
@@ -366,33 +365,41 @@
             });
             const parts = formatter.formatToParts(new Date());
             const get = type => parts.find(p => p.type === type)?.value;
-            // Crear un objeto Date con los componentes de Buenos Aires
             return new Date(
                 `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`
             );
         }
 
-        // Función para determinar el estado del evento en el frontend
+        // --- FUNCIÓN MODIFICADA ---
+        // Determina el estado del evento (PRONTO, En vivo, Finalizado) basado en la hora de Buenos Aires.
         function determineEventStatus(eventTime, eventDate) {
             try {
-                if (!eventTime || eventTime === '00:00') return 'Próximo';
+                // Si el evento no tiene hora o es 00:00, se considera PRONTO por defecto.
+                if (!eventTime || eventTime === '00:00') return 'PRONTO';
+
                 const nowBuenosAires = getBuenosAiresTime();
                 let baseDate = eventDate || new Date().toISOString().split('T')[0];
+                
                 const [year, month, day] = baseDate.split('-').map(Number);
                 const [eventHour, eventMinute] = eventTime.split(':').map(Number);
-                if (isNaN(eventHour) || isNaN(eventMinute)) return 'Próximo';
+
+                // Si la hora del evento no es válida, se considera PRONTO.
+                if (isNaN(eventHour) || isNaN(eventMinute)) return 'PRONTO';
+
                 const eventStart = new Date(year, month - 1, day, eventHour, eventMinute, 0, 0);
+                // El evento se considera finalizado 3 horas (180 minutos) después de su inicio.
                 const eventEnd = new Date(eventStart.getTime() + (180 * 60 * 1000));
+
                 if (nowBuenosAires >= eventStart && nowBuenosAires < eventEnd) {
                     return 'En vivo';
                 } else if (nowBuenosAires < eventStart) {
-                    return 'Próximo';
+                    return 'PRONTO';
                 } else {
                     return 'Finalizado';
                 }
             } catch (error) {
                 console.error('Error al determinar estado del evento:', error);
-                return 'Próximo';
+                return 'PRONTO'; // En caso de cualquier error, se asume PRONTO.
             }
         }
 
@@ -425,13 +432,21 @@
             }
         }
 
+        // --- FUNCIÓN MODIFICADA ---
+        // Crea la tarjeta de un evento, incluyendo el indicador de estado (badge).
         function createEventCard(event) {
-            // Calcular el estado en tiempo real
             const currentStatus = determineEventStatus(event.time, event.date);
             let statusBadge = '';
-            if (currentStatus.toLowerCase() === 'en vivo') {
+
+            // Genera el badge HTML correspondiente al estado del evento.
+            if (currentStatus === 'En vivo') {
                 statusBadge = `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white uppercase status-live">EN VIVO</span>`;
+            } else if (currentStatus === 'PRONTO') {
+                statusBadge = `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white uppercase status-upcoming">PRONTO</span>`;
+            } else { // 'Finalizado'
+                statusBadge = `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white uppercase status-finished">FINALIZADO</span>`;
             }
+
             return `
                 <div class="event-card rounded-lg p-4">
                     <div class="flex flex-col space-y-4">
@@ -455,34 +470,39 @@
             `;
         }
 
+        // --- FUNCIÓN MODIFICADA ---
+        // Filtra y ordena los eventos según la búsqueda y el estado actual.
         function filterAndSortEvents() {
             const searchTerm = document.getElementById('search').value.toLowerCase();
             let filteredEvents = allEvents.filter(event => 
                 event.title.toLowerCase().includes(searchTerm)
             );
 
-            // Actualizar estados y ordenar
+            // Actualiza el estado de cada evento y luego lo ordena.
             filteredEvents = filteredEvents.map(event => ({
                 ...event,
                 currentStatus: determineEventStatus(event.time, event.date)
             })).sort((a, b) => {
-                // Primero: En vivo
-                if (a.currentStatus === 'En vivo' && b.currentStatus !== 'En vivo') return -1;
-                if (a.currentStatus !== 'En vivo' && b.currentStatus === 'En vivo') return 1;
+                // Prioridad de ordenamiento: 1. En vivo, 2. PRONTO, 3. Finalizado.
+                const statusOrder = { 'En vivo': 1, 'PRONTO': 2, 'Finalizado': 3 };
+                const orderA = statusOrder[a.currentStatus] || 3;
+                const orderB = statusOrder[b.currentStatus] || 3;
                 
-                // Segundo: Próximos (ordenados por horario)
-                if (a.currentStatus === 'Próximo' && b.currentStatus === 'Finalizado') return -1;
-                if (a.currentStatus === 'Finalizado' && b.currentStatus === 'Próximo') return 1;
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
                 
-                // Dentro del mismo estado, ordenar por hora
+                // Si el estado es el mismo, ordenar por hora (de más temprano a más tarde).
                 const [hourA, minuteA] = a.time.split(':').map(Number);
                 const [hourB, minuteB] = b.time.split(':').map(Number);
-                const timeA = hourA * 60 + minuteA;
-                const timeB = hourB * 60 + minuteB;
+                const timeA = (isNaN(hourA) ? 0 : hourA) * 60 + (isNaN(minuteA) ? 0 : minuteA);
+                const timeB = (isNaN(hourB) ? 0 : hourB) * 60 + (isNaN(minuteB) ? 0 : minuteB);
+
                 if (timeA !== timeB) {
                     return timeA - timeB;
                 }
-                // Si tienen el mismo horario, ordenar alfabéticamente por título
+
+                // Si el horario también es el mismo, ordenar alfabéticamente por título.
                 return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
             });
 
@@ -521,7 +541,7 @@
             filterAndSortEvents();
         }
 
-        // Actualizar estados cada minuto
+        // Actualizar estados cada minuto para reflejar cambios en tiempo real.
         setInterval(() => {
             if (allEvents.length > 0) {
                 filterAndSortEvents();
