@@ -408,6 +408,10 @@
         }
 
         function getButtonText(link) {
+            // Excepción especial para FOX SPORTS
+            if (link === 'https://play.alangulotv.live/?channel=fox-a') {
+                return 'FOX SPORTS';
+            }
             try {
                 const url = new URL(link);
                 const channelParam = url.searchParams.get('channel');
