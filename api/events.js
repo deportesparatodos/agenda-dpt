@@ -292,7 +292,6 @@ async function fetchAlanGuloTVEvents() {
                         }
                         let channelKey = null;
                         if (canalKey) {
-                            // Buscar en el mapeo por fallback normalizado
                             for (const key in channelsGrouped) {
                                 if (normalizeChannelForFallback(key) === canalKey.toLowerCase()) {
                                     channelKey = channelsGrouped[key][0];
@@ -307,11 +306,19 @@ async function fetchAlanGuloTVEvents() {
                         if (/^disney\d+$/i.test(channelKey)) {
                             channelKey = channelKey + '-a';
                         }
-                        finalLink = `https://play.alangulotv.live/?channel=${channelKey}`;
-                        links.push({
-                            name: buttonName,
-                            url: finalLink
-                        });
+                        // Si el channelKey es mayor a 10 caracteres, usar el link original y el texto original
+                        if (channelKey.length > 10) {
+                            links.push({
+                                name: buttonName,
+                                url: href
+                            });
+                        } else {
+                            finalLink = `https://play.alangulotv.live/?channel=${channelKey}`;
+                            links.push({
+                                name: buttonName,
+                                url: finalLink
+                            });
+                        }
                     });
                 }
                 
