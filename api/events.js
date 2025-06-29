@@ -284,38 +284,36 @@ async function fetchAlanGuloTVEvents() {
                         const href = $link.attr('href');
                         let buttonName = $link.text().trim();
                         if (!buttonName) buttonName = 'CANAL';
-                        // Normalizar el texto del botón para comparación flexible
-                        const normalizedButton = buttonName.replace(/\s+/g, '').toLowerCase();
                         let finalLink;
-                        if (normalizedButton === 'multif1') {
-                            finalLink = 'https://alangulotv.live/canal/multi-f1/';
-                        } else if (normalizedButton === 'telemetriaoficialdealangulotv') {
-                            finalLink = 'https://alangulo-dashboard-f1.vercel.app/';
-                        } else {
-                            // Si el href es /canal/xxx/ o https://alangulotv.live/canal/xxx/ extraer xxx y usarlo como key
-                            let canalKey = null;
-                            const canalMatch = href && href.match(/\/canal\/([a-zA-Z0-9\-]+)\//);
-                            if (canalMatch) {
-                                canalKey = canalMatch[1].replace(/-/g, '');
-                            }
-                            let channelKey = null;
-                            if (canalKey) {
-                                // Buscar en el mapeo por fallback normalizado
-                                for (const key in channelsGrouped) {
-                                    if (normalizeChannelForFallback(key) === canalKey.toLowerCase()) {
-                                        channelKey = channelsGrouped[key][0];
-                                        break;
-                                    }
+                        // Si el href es /canal/xxx/ o https://alangulotv.live/canal/xxx/ extraer xxx y usarlo como key
+                        let canalKey = null;
+                        const canalMatch = href && href.match(/\/canal\/([a-zA-Z0-9\-]+)\//);
+                        if (canalMatch) {
+                            canalKey = canalMatch[1].replace(/-/g, '');
+                        }
+                        let channelKey = null;
+                        if (canalKey) {
+                            // Buscar en el mapeo por fallback normalizado
+                            for (const key in channelsGrouped) {
+                                if (normalizeChannelForFallback(key) === canalKey.toLowerCase()) {
+                                    channelKey = channelsGrouped[key][0];
+                                    break;
                                 }
-                                if (!channelKey) channelKey = canalKey;
-                            } else {
-                                channelKey = normalizeChannelForFallback(buttonName);
                             }
-                            // Si el canal es disney1, disney2, etc, agregar '-a' al final
-                            if (/^disney\d+$/i.test(channelKey)) {
-                                channelKey = channelKey + '-a';
-                            }
-                            finalLink = `https://play.alangulotv.live/?channel=${channelKey}`;
+                            if (!channelKey) channelKey = canalKey;
+                        } else {
+                            channelKey = normalizeChannelForFallback(buttonName);
+                        }
+                        // Si el canal es disney1, disney2, etc, agregar '-a' al final
+                        if (/^disney\d+$/i.test(channelKey)) {
+                            channelKey = channelKey + '-a';
+                        }
+                        finalLink = `https://play.alangulotv.live/?channel=${channelKey}`;
+                        // REEMPLAZO FINAL SEGÚN TU PEDIDO
+                        if (finalLink === 'https://play.alangulotv.live/?channel=telemetraoficialdealangulotv') {
+                            finalLink = 'https://alangulo-dashboard-f1.vercel.app/';
+                        } else if (finalLink === 'https://play.alangulotv.live/?channel=multif1') {
+                            finalLink = 'https://alangulotv.live/canal/multi-f1/';
                         }
                         links.push({
                             name: buttonName,
