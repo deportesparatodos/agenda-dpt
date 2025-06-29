@@ -447,7 +447,7 @@ export default async (req, res) => {
     try {
         console.log('Iniciando obtención de eventos...');
         
-        // Obtener eventos de ambas fuentes en paralelo con timeout
+        // Obtener eventos de ambas fuentes en paralelo with timeout
         const [streamTpEvents, alanGuloEvents] = await Promise.allSettled([
             Promise.race([
                 fetchStreamTpGlobalEvents(),
