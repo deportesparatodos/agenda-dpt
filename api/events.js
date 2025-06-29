@@ -309,6 +309,12 @@ async function fetchAlanGuloTVEvents() {
                             channelKey = channelKey + '-a';
                         }
                         finalLink = `https://play.alangulotv.live/?channel=${channelKey}`;
+                        // REEMPLAZOS ESPECIALES
+                        if (finalLink === 'https://play.alangulotv.live/?channel=disneyextensinpc') {
+                            finalLink = 'https://play.alangulotv.live/?channel=transmi1';
+                        } else if (finalLink === 'https://play.alangulotv.live/?channel=foxsportsmx') {
+                            finalLink = 'https://play.alangulotv.live/?channel=foxmx-a';
+                        }
                         // REEMPLAZO FINAL SEGÚN TU PEDIDO
                         if (finalLink === 'https://play.alangulotv.live/?channel=telemetraoficialdealangulotv') {
                             finalLink = 'https://alangulo-dashboard-f1.vercel.app/';
