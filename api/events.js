@@ -561,4 +561,19 @@ export default async (req, res) => {
             // Si algún botón es 'OPCION', reemplazarlo por 'CANAL' salvo que sea especial
             event.buttons = event.buttons.map((btn, idx) => {
                 if (!btn || btn.toUpperCase().includes('OPCION')) {
-                    if
+                    if (event.options[idx] === 'https://alangulotv.live/canal/multi-f1/') return 'MULTICAM (ALANGULOTV)';
+                    if (event.options[idx] === 'https://alangulo-dashboard-f1.vercel.app/') return 'TELEMETRIA OFICIAL';
+                    return 'CANAL';
+                }
+                return btn;
+            });
+            return event;
+        });
+
+        // Devolver respuesta
+        return res.status(200).json(adaptedEvents);
+    } catch (error) {
+        console.error('Error en la función principal:', error);
+        return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
