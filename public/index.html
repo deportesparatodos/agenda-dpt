@@ -393,17 +393,21 @@
             const [year, month, day] = baseDate.split('-').map(Number);
             const [eventHour, eventMinute] = event.time.split(':').map(Number);
             if (isNaN(eventHour) || isNaN(eventMinute)) return 'PRONTO';
-            // Obtener la hora actual de Buenos Aires
-            const now = new Date();
-            // Intl API para obtener la hora local de Buenos Aires
-            const nowBA = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+            // Obtener la hora actual de Buenos Aires (componentes)
+            const nowBA = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+            const nowYear = nowBA.getFullYear();
+            const nowMonth = nowBA.getMonth();
+            const nowDay = nowBA.getDate();
+            const nowHour = nowBA.getHours();
+            const nowMinute = nowBA.getMinutes();
             // Crear la fecha/hora de inicio del evento en Buenos Aires
             const eventStart = new Date(year, month - 1, day, eventHour, eventMinute, 0, 0);
             // Fecha/hora de fin (3 horas después)
             const eventEnd = new Date(eventStart.getTime() + 3 * 60 * 60 * 1000);
-            if (nowBA < eventStart) {
+            // Comparar usando getTime()
+            if (nowBA.getTime() < eventStart.getTime()) {
                 return 'PRONTO';
-            } else if (nowBA >= eventStart && nowBA < eventEnd) {
+            } else if (nowBA.getTime() >= eventStart.getTime() && nowBA.getTime() < eventEnd.getTime()) {
                 return 'EN VIVO';
             } else {
                 return 'FINALIZADO';
