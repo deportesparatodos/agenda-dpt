@@ -426,13 +426,14 @@
         }
 
         function createEventCard(event, idx) {
-            // Determinar clase y texto del estado
+            // Calcular estado en frontend usando la hora de Buenos Aires
+            const status = determineEventStatus(event.time, event.date);
             let statusHtml = '';
-            if (event.status === 'En vivo') {
+            if (status === 'En vivo') {
                 statusHtml = '<span class="ml-2 px-2 py-1 rounded text-xs font-bold status-live">EN VIVO</span>';
-            } else if (event.status === 'Próximo') {
+            } else if (status === 'Próximo') {
                 statusHtml = '<span class="ml-2 px-2 py-1 rounded text-xs font-bold status-upcoming">PRÓXIMO</span>';
-            } else if (event.status === 'Finalizado') {
+            } else if (status === 'Finalizado') {
                 statusHtml = '<span class="ml-2 px-2 py-1 rounded text-xs font-bold status-finished">FINALIZADO</span>';
             }
             return `
