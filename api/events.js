@@ -544,6 +544,18 @@ export default async (req, res) => {
         // Convertir el Map a array y ordenar correctamente
         const adaptedEvents = Array.from(eventMap.values())
             .map(event => {
+                // Forzar nombre de botón para links especiales
+                if (event.options && event.options.length > 0) {
+                    event.options = event.options.map((opt, idx) => {
+                        if (opt === 'https://alangulotv.live/canal/multi-f1/') {
+                            if (event.buttons && event.buttons.length > idx) event.buttons[idx] = 'MULTICAM (ALANGULOTV)';
+                        }
+                        if (opt === 'https://alangulo-dashboard-f1.vercel.app/') {
+                            if (event.buttons && event.buttons.length > idx) event.buttons[idx] = 'TELEMETRIA OFICIAL';
+                        }
+                        return opt;
+                    });
+                }
                 if (event.buttons && Array.isArray(event.buttons)) {
                     // Filtrar botones que sean 'OPCION' o vacíos SOLO si hay otros válidos
                     let validButtons = event.buttons.filter(btn => btn && !btn.toUpperCase().includes('OPCION'));
