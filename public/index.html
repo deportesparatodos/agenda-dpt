@@ -380,13 +380,42 @@
             }
         }
 
+        function getBuenosAiresDate() {
+            // Devuelve la fecha y hora actual de Buenos Aires (UTC-3)
+            const nowUTC = new Date();
+            // Buenos Aires está en UTC-3
+            return new Date(nowUTC.getTime() - (3 * 60 * 60 * 1000));
+        }
+
+        function getEventStatus(event) {
+            if (!event.time || event.time === '00:00') return 'Próximo';
+            const baseDate = event.date || new Date().toISOString().split('T')[0];
+            const [year, month, day] = baseDate.split('-').map(Number);
+            const [eventHour, eventMinute] = event.time.split(':').map(Number);
+            if (isNaN(eventHour) || isNaN(eventMinute)) return 'Próximo';
+            // Hora de inicio y fin del evento en Buenos Aires (en ms)
+            const eventStart = new Date(Date.UTC(year, month - 1, day, eventHour + 3, eventMinute, 0, 0));
+            const eventEnd = new Date(eventStart.getTime() + 3 * 60 * 60 * 1000);
+            const now = new Date();
+            // Hora actual de Buenos Aires
+            const nowBA = new Date(now.getTime() - (3 * 60 * 60 * 1000));
+            if (nowBA >= eventStart && nowBA < eventEnd) {
+                return 'EN VIVO';
+            } else if (nowBA < eventStart) {
+                return 'PRONTO';
+            } else {
+                return 'FINALIZADO';
+            }
+        }
+
         function createEventCard(event) {
+            const statusText = getEventStatus(event);
             let statusClass = '';
-            switch(event.status.toLowerCase()) {
-                case 'en vivo':
+            switch(statusText) {
+                case 'EN VIVO':
                     statusClass = 'status-live';
                     break;
-                case 'finalizado':
+                case 'FINALIZADO':
                     statusClass = 'status-finished';
                     break;
                 default:
@@ -398,7 +427,7 @@
                         <div>
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white uppercase ${statusClass}">
-                                    ${event.status}
+                                    ${statusText}
                                 </span>
                                 <span class="text-sm text-gray-300">${event.time}</span>
                             </div>

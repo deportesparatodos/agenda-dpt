@@ -25,39 +25,9 @@ function adjustTimeZone(time, date) {
     }
 }
 
-// Función para determinar si un evento está en vivo, próximo o finalizado usando la hora real de Buenos Aires
+// Devuelve SIEMPRE el estado 'raw' (sin calcular) y deja que el frontend lo calcule
 function determineEventStatus(eventTime, eventDate) {
-    try {
-        if (!eventTime || eventTime === '00:00') return 'Próximo';
-
-        // Obtener la fecha base (YYYY-MM-DD)
-        let baseDate = eventDate || new Date().toISOString().split('T')[0];
-        const [year, month, day] = baseDate.split('-').map(Number);
-        const [eventHour, eventMinute] = eventTime.split(':').map(Number);
-        if (isNaN(eventHour) || isNaN(eventMinute)) return 'Próximo';
-
-        // Obtener la hora actual de Buenos Aires (independiente de la zona del server)
-        // 1. Obtener la hora UTC actual
-        const nowUTC = new Date(Date.now());
-        // 2. Calcular la hora de Buenos Aires (UTC-3)
-        const nowBuenosAires = new Date(nowUTC.getTime() - (3 * 60 * 60 * 1000));
-
-        // Crear objeto Date para el inicio del evento en Buenos Aires (en UTC)
-        const eventStartUTC = Date.UTC(year, month - 1, day, eventHour + 3, eventMinute, 0, 0); // +3 para llevarlo a UTC
-        const eventEndUTC = eventStartUTC + (3 * 60 * 60 * 1000); // 3 horas después
-        const nowUTCms = nowUTC.getTime();
-
-        if (nowUTCms >= eventStartUTC && nowUTCms < eventEndUTC) {
-            return 'En vivo';
-        } else if (nowUTCms < eventStartUTC) {
-            return 'Próximo';
-        } else {
-            return 'Finalizado';
-        }
-    } catch (error) {
-        console.error('Error al determinar estado del evento:', error);
-        return 'Próximo';
-    }
+    return null; // No calcular aquí, lo hará el frontend
 }
 
 /**
@@ -535,7 +505,6 @@ export default async (req, res) => {
             // El estado se calcula SIEMPRE usando la hora que se muestra (event.time ya ajustada)
             const key = `${event.title || 'Sin título'}__${event.time || '00:00'}__${event.source}`;
             if (!eventMap.has(key)) {
-                const status = determineEventStatus(event.time, event.date); // event.time es la que ve el usuario
                 eventMap.set(key, {
                     time: event.time || '00:00',
                     title: event.title || 'Sin título',
@@ -544,7 +513,7 @@ export default async (req, res) => {
                     category: event.category || 'Sin categoría',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
-                    status: status,
+                    status: null, // El frontend lo calculará
                     source: event.source || 'unknown'
                 });
             } else {
@@ -576,6 +545,7 @@ export default async (req, res) => {
                         }
                     }
                 }
+                event.status = null; // El frontend lo calculará
                 return event;
             })
             .sort((a, b) => {
