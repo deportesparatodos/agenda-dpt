@@ -441,7 +441,6 @@
                     <div class="flex flex-col space-y-4">
                         <div>
                             <div class="flex items-center gap-2 mb-2">
-                                <span class="text-sm text-gray-300">Evento ${idx + 1}</span>
                                 <span class="text-sm text-gray-300">${event.time}</span>
                                 ${statusHtml}
                             </div>
@@ -466,8 +465,16 @@
                 event.title.toLowerCase().includes(searchTerm)
             );
 
-            // Ordenar por hora y título (sin estados)
-            filteredEvents = filteredEvents.sort((a, b) => {
+            // Calcular estado y separar eventos
+            const enVivo = [], proximo = [], finalizado = [];
+            filteredEvents.forEach(event => {
+                const status = determineEventStatus(event.time, event.date);
+                if (status === 'En vivo') enVivo.push(event);
+                else if (status === 'Próximo') proximo.push(event);
+                else finalizado.push(event);
+            });
+            // Ordenar cada grupo por hora y título
+            function sortByTimeAndTitle(a, b) {
                 const [hourA, minuteA] = a.time.split(':').map(Number);
                 const [hourB, minuteB] = b.time.split(':').map(Number);
                 const timeA = hourA * 60 + minuteA;
@@ -476,11 +483,16 @@
                     return timeA - timeB;
                 }
                 return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
-            });
+            }
+            enVivo.sort(sortByTimeAndTitle);
+            proximo.sort(sortByTimeAndTitle);
+            finalizado.sort(sortByTimeAndTitle);
+
+            const ordered = [...enVivo, ...proximo, ...finalizado];
 
             document.getElementById('events-container').innerHTML = 
-                filteredEvents.length > 0 
-                    ? filteredEvents.map((event, idx) => createEventCard(event, idx)).join('')
+                ordered.length > 0 
+                    ? ordered.map((event, idx) => createEventCard(event, idx)).join('')
                     : '<p class="text-center text-gray-400">No se encontraron eventos</p>';
         }
 
