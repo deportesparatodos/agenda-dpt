@@ -312,6 +312,12 @@ async function fetchAlanGuloTVEvents() {
                             if (href && href.startsWith('/')) {
                                 absoluteHref = `https://alangulotv.live${href}`;
                             }
+                            // Si el link termina con /ext/{canal}/, reemplazar por https://play.alangulotv.live/?channel={canal}
+                            const extMatch = absoluteHref.match(/\/ext\/([a-zA-Z0-9\-]+)\/$/);
+                            if (extMatch) {
+                                const canal = extMatch[1].replace(/-/g, '');
+                                absoluteHref = `https://play.alangulotv.live/?channel=${canal}`;
+                            }
                             links.push({
                                 name: buttonName,
                                 url: absoluteHref
