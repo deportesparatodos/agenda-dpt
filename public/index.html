@@ -393,21 +393,19 @@
             const [year, month, day] = baseDate.split('-').map(Number);
             const [eventHour, eventMinute] = event.time.split(':').map(Number);
             if (isNaN(eventHour) || isNaN(eventMinute)) return 'PRONTO';
-            // Obtener la hora actual de Buenos Aires (componentes)
-            const nowBA = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
-            const nowYear = nowBA.getFullYear();
-            const nowMonth = nowBA.getMonth();
-            const nowDay = nowBA.getDate();
-            const nowHour = nowBA.getHours();
-            const nowMinute = nowBA.getMinutes();
-            // Crear la fecha/hora de inicio del evento en Buenos Aires
-            const eventStart = new Date(year, month - 1, day, eventHour, eventMinute, 0, 0);
-            // Fecha/hora de fin (3 horas después)
-            const eventEnd = new Date(eventStart.getTime() + 3 * 60 * 60 * 1000);
-            // Comparar usando getTime()
-            if (nowBA.getTime() < eventStart.getTime()) {
+            // Obtener la hora actual de Buenos Aires en milisegundos desde epoch UTC
+            const nowBA = new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' });
+            const [fecha, hora] = nowBA.split(', ');
+            const [mes, dia, anio] = fecha.split('/').map(Number);
+            const [horaActual, minutoActual, segundoActual] = hora.split(':').map(Number);
+            // nowBA en ms
+            const nowBAMS = Date.UTC(anio, mes - 1, dia, horaActual, minutoActual, segundoActual || 0);
+            // Evento en ms (en Buenos Aires)
+            const eventStart = Date.UTC(year, month - 1, day, eventHour, eventMinute, 0);
+            const eventEnd = eventStart + 3 * 60 * 60 * 1000;
+            if (nowBAMS < eventStart) {
                 return 'PRONTO';
-            } else if (nowBA.getTime() >= eventStart.getTime() && nowBA.getTime() < eventEnd.getTime()) {
+            } else if (nowBAMS >= eventStart && nowBAMS < eventEnd) {
                 return 'EN VIVO';
             } else {
                 return 'FINALIZADO';
