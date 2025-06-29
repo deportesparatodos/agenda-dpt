@@ -312,8 +312,10 @@ async function fetchAlanGuloTVEvents() {
                         // REEMPLAZO FINAL SEGÚN TU PEDIDO
                         if (finalLink === 'https://play.alangulotv.live/?channel=telemetraoficialdealangulotv') {
                             finalLink = 'https://alangulo-dashboard-f1.vercel.app/';
+                            buttonName = 'TELEMETRIA OFICIAL';
                         } else if (finalLink === 'https://play.alangulotv.live/?channel=multif1') {
                             finalLink = 'https://alangulotv.live/canal/multi-f1/';
+                            buttonName = 'MULTICAM (ALANGULOTV)';
                         }
                         links.push({
                             name: buttonName,
