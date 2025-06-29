@@ -611,6 +611,23 @@ export default async (req, res) => {
             return event;
         });
 
+        // Función para quitar prefijos del título (todo hasta el primer ': ')
+        function quitarPrefijoTitulo(titulo) {
+            if (!titulo) return '';
+            const partes = titulo.split(': ');
+            return partes.length > 1 ? partes.slice(1).join(': ').trim() : titulo.trim();
+        }
+
+        // Ordenar eventos por hora y luego por título sin prefijo
+        adaptedEvents.sort((a, b) => {
+            if (a.time === b.time) {
+                const tituloA = quitarPrefijoTitulo(a.title).toLowerCase();
+                const tituloB = quitarPrefijoTitulo(b.title).toLowerCase();
+                return tituloA.localeCompare(tituloB, 'es');
+            }
+            return a.time.localeCompare(b.time);
+        });
+
         // Devolver respuesta
         return res.status(200).json(adaptedEvents);
     } catch (error) {
