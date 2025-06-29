@@ -67,6 +67,8 @@ const channelsGrouped = {
     'ESPN 5': ['espn5-a', 'espn5-b', 'espn5-c', 'espn5-d', 'espn5'],
     'ESPN 6': ['espn6-a', 'espn6-b', 'espn6-c', 'espn6-d', 'espn6'],
     'ESPN 7': ['espn7-a', 'espn7-b', 'espn7-c', 'espn7-d', 'espn7'],
+    'ESPNDEPORTES': ['espndeportes-a'],
+    'ESPN DEPORTES': ['espndeportes-a'],
     'ESPN PREMIUM': ['espn-premium-a', 'espn-premium-b', 'espn-premium-c', 'espn-premium-d', 'espnpremium'],
     'TNT SPORTS': ['tnt-a', 'tnt-b', 'tnt-c', 'tnt-d', 'tntsports'],
     'TYC SPORTS': ['tyc-a', 'tyc-b', 'tyc-c', 'tyc-d'],
