@@ -544,7 +544,9 @@
 
         // Actualizar estados cada minuto
         setInterval(() => {
-            filterAndSortEvents();
+            if (allEvents.length > 0) {
+                filterAndSortEvents();
+            }
         }, 60000);
 
         document.getElementById('search').addEventListener('input', () => {
