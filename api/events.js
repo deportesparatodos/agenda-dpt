@@ -622,18 +622,15 @@ export default async (req, res) => {
             }
         });
 
-        // --- AGRUPACIÓN AVANZADA DE EVENTOS ---
-        // 1. Quitar prefijos para comparar
+        // --- AGRUPACIÓN AVANZADA DE EVENTOS (idéntica al frontend) ---
         function quitarPrefijoTitulo(titulo) {
             if (!titulo) return '';
             const partes = titulo.split(': ');
             return partes.length > 1 ? partes.slice(1).join(': ').trim() : titulo.trim();
         }
-        // 2. Normalizar texto para similitud
         function normalizarTexto(txt) {
             return txt.toLowerCase().replace(/[^a-z0-9áéíóúüñ\s]/gi, '').replace(/\s+/g, ' ').trim();
         }
-        // 3. Calcular similitud de palabras (Jaccard)
         function similitudPalabras(a, b) {
             const setA = new Set(normalizarTexto(a).split(' '));
             const setB = new Set(normalizarTexto(b).split(' '));
@@ -641,36 +638,40 @@ export default async (req, res) => {
             const union = new Set([...setA, ...setB]);
             return union.size === 0 ? 0 : inter.size / union.size;
         }
-        // 4. Agrupar eventos por hora y similitud de título
+        function extraerEquipos(titulo) {
+            const sinPrefijo = quitarPrefijoTitulo(titulo);
+            const vsMatch = sinPrefijo.match(/(.+?)\s+vs\.?\s+(.+)/i);
+            if (vsMatch) {
+                const norm = s => s.toLowerCase().normalize('NFD').replace(/[\'’`´]/g, "'").replace(/[\u0300-\u036f]/g, '').replace(/\b(fc|old boys|club|deportivo|cd|cf|ac|sc|ca|athletic|united|city|sporting|real|club atlético|atlético|atletico|the|los|las|el|la|de|del|y|and)\b/gi, '').replace(/[^a-z0-9']/g, '').trim();
+                return [norm(vsMatch[1]), norm(vsMatch[2])].sort();
+            }
+            return [sinPrefijo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9']/g, '').trim()];
+        }
+        function equiposCoinciden(ev1, ev2) {
+            const eq1 = extraerEquipos(ev1.title);
+            const eq2 = extraerEquipos(ev2.title);
+            return eq1.length === eq2.length && eq1.every((e, i) => e === eq2[i]);
+        }
         const agrupados = [];
         for (const ev of adaptedEvents) {
-            const tituloSinPrefijo = quitarPrefijoTitulo(ev.title);
             const horario = ev.time;
-            // Buscar si ya hay un grupo compatible
             let encontrado = false;
             for (const grupo of agrupados) {
-                // Coincide horario
                 if (grupo.time === horario) {
-                    // Coincidencia exacta de título sin prefijo
-                    if (quitarPrefijoTitulo(grupo.title) === tituloSinPrefijo) {
-                        // Unir opciones y botones
+                    if (equiposCoinciden(grupo, ev)) {
                         grupo.options.push(...ev.options);
                         grupo.buttons.push(...ev.buttons);
-                        // El título mostrado será el prefijo + evento (el que tiene prefijo)
-                        if (grupo.title !== ev.title) {
-                            grupo.title = grupo.title.includes(':') ? grupo.title : ev.title;
+                        if (ev.title.length > grupo.title.length) {
+                            grupo.title = ev.title;
                         }
                         encontrado = true;
                         break;
                     }
-                    // Similitud ≥ 0.75
-                    if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), tituloSinPrefijo) >= 0.75) {
-                        // Unir opciones y botones
+                    if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), quitarPrefijoTitulo(ev.title)) >= 0.75) {
                         grupo.options.push(...ev.options);
                         grupo.buttons.push(...ev.buttons);
-                        // El título será ambos títulos unidos por /
-                        if (!grupo.title.includes(ev.title)) {
-                            grupo.title = `${grupo.title} / ${ev.title}`;
+                        if (ev.title.length > grupo.title.length) {
+                            grupo.title = ev.title;
                         }
                         encontrado = true;
                         break;
@@ -678,11 +679,9 @@ export default async (req, res) => {
                 }
             }
             if (!encontrado) {
-                // Nuevo grupo
                 agrupados.push({ ...ev, options: [...ev.options], buttons: [...ev.buttons] });
             }
         }
-        // Devolver respuesta agrupada
         return res.status(200).json(agrupados);
     } catch (error) {
         console.error('Error en la función principal:', error);
