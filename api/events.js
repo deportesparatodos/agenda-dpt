@@ -611,6 +611,17 @@ export default async (req, res) => {
             return event;
         });
 
+        // Cambiar todos los enlaces play.alangulotv.live por p.alangulotv.live en la API antes de devolver
+        adaptedEvents.forEach(ev => {
+            if (ev.options && Array.isArray(ev.options)) {
+                ev.options = ev.options.map(link =>
+                    typeof link === 'string' && link.startsWith('https://play.alangulotv.live')
+                        ? link.replace('https://play.alangulotv.live', 'https://p.alangulotv.live')
+                        : link
+                );
+            }
+        });
+
         // --- AGRUPACIÓN AVANZADA DE EVENTOS ---
         // 1. Quitar prefijos para comparar
         function quitarPrefijoTitulo(titulo) {
