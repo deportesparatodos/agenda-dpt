@@ -531,26 +531,45 @@
         }
         function agruparEventosAvanzado(eventos) {
             const agrupados = [];
+            function extraerEquipos(titulo) {
+                // Quita prefijo y busca patrón "equipo1 vs equipo2"
+                const sinPrefijo = quitarPrefijoTitulo(titulo);
+                const vsMatch = sinPrefijo.match(/(.+?)\s+vs\.?\s+(.+)/i);
+                if (vsMatch) {
+                    // Normaliza nombres (quita tildes, minúsculas, quita FC, Old Boys, etc)
+                    const norm = s => s.toLowerCase().normalize('NFD').replace(/['’`´]/g, "'").replace(/[\u0300-\u036f]/g, '').replace(/\b(fc|old boys|club|deportivo|cd|cf|ac|sc|ca|athletic|united|city|sporting|real|club atlético|atlético|atletico|the|los|las|el|la|de|del|y|and)\b/gi, '').replace(/[^a-z0-9']/g, '').trim();
+                    return [norm(vsMatch[1]), norm(vsMatch[2])].sort();
+                }
+                // Si no hay vs, devolver todo normalizado
+                return [sinPrefijo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9']/g, '').trim()];
+            }
+            function equiposCoinciden(ev1, ev2) {
+                const eq1 = extraerEquipos(ev1.title);
+                const eq2 = extraerEquipos(ev2.title);
+                return eq1.length === eq2.length && eq1.every((e, i) => e === eq2[i]);
+            }
             for (const ev of eventos) {
-                const tituloSinPrefijo = quitarPrefijoTitulo(ev.title);
                 const horario = ev.time;
                 let encontrado = false;
                 for (const grupo of agrupados) {
                     if (grupo.time === horario) {
-                        if (quitarPrefijoTitulo(grupo.title) === tituloSinPrefijo) {
+                        // Coincidencia exacta de equipos (sin importar orden ni prefijos)
+                        if (equiposCoinciden(grupo, ev)) {
                             grupo.options.push(...ev.options);
                             grupo.buttons.push(...ev.buttons);
-                            if (grupo.title !== ev.title) {
-                                grupo.title = grupo.title.includes(':') ? grupo.title : ev.title;
+                            // El título será el más largo (con prefijo)
+                            if (ev.title.length > grupo.title.length) {
+                                grupo.title = ev.title;
                             }
                             encontrado = true;
                             break;
                         }
-                        if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), tituloSinPrefijo) >= 0.75) {
+                        // Similitud ≥ 0.75 (fallback)
+                        if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), quitarPrefijoTitulo(ev.title)) >= 0.75) {
                             grupo.options.push(...ev.options);
                             grupo.buttons.push(...ev.buttons);
-                            if (!grupo.title.includes(ev.title)) {
-                                grupo.title = `${grupo.title} / ${ev.title}`;
+                            if (ev.title.length > grupo.title.length) {
+                                grupo.title = ev.title;
                             }
                             encontrado = true;
                             break;
@@ -566,12 +585,10 @@
 
         async function loadEvents() {
             document.getElementById('events-container').innerHTML = '<div class="flex items-center justify-center"><div class="loading-spinner"></div></div>';
-
             try {
                 const response = await fetch('/api/events');
                 if (!response.ok) throw new Error('Error al obtener eventos');
                 let eventos = await response.json();
-                // Agrupación avanzada en frontend
                 // Cambiar todos los enlaces play.alangulotv.live por p.alangulotv.live
                 eventos.forEach(ev => {
                     if (ev.options && Array.isArray(ev.options)) {
