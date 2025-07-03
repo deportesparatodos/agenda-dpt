@@ -513,49 +513,44 @@
                     : '<p class="text-center text-gray-400">No se encontraron eventos</p>';
         }
 
-        // --- AGRUPACIÓN AVANZADA DE EVENTOS EN FRONTEND (MEJORADA PARA VS INVERTIDO Y PREFIJOS) ---
-        function extraerEquipos(titulo) {
-            // Quita prefijo y busca patrón "equipo1 vs equipo2"
-            const sinPrefijo = quitarPrefijoTitulo(titulo);
-            const vsMatch = sinPrefijo.match(/(.+?)\s+vs\.?\s+(.+)/i);
-            if (vsMatch) {
-                // Normaliza nombres (quita tildes, minúsculas, quita FC, Old Boys, etc)
-                const norm = s => s.toLowerCase().normalize('NFD').replace(/['’`´]/g, "'").replace(/[\u0300-\u036f]/g, '').replace(/\b(fc|old boys|club|deportivo|cd|cf|ac|sc|ca|athletic|united|city|sporting|real|club atlético|atlético|atletico|the|los|las|el|la|de|del|y|and)\b/gi, '').replace(/[^a-z0-9']/g, '').trim();
-                return [norm(vsMatch[1]), norm(vsMatch[2])].sort();
-            }
-            // Si no hay vs, devolver todo normalizado
-            return [sinPrefijo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9']/g, '').trim()];
+        // --- AGRUPACIÓN AVANZADA DE EVENTOS EN FRONTEND ---
+        function quitarPrefijoTitulo(titulo) {
+            if (!titulo) return '';
+            const partes = titulo.split(': ');
+            return partes.length > 1 ? partes.slice(1).join(': ').trim() : titulo.trim();
         }
-        function equiposCoinciden(ev1, ev2) {
-            const eq1 = extraerEquipos(ev1.title);
-            const eq2 = extraerEquipos(ev2.title);
-            return eq1.length === eq2.length && eq1.every((e, i) => e === eq2[i]);
+        function normalizarTexto(txt) {
+            return txt.toLowerCase().replace(/[^a-z0-9áéíóúüñ\s]/gi, '').replace(/\s+/g, ' ').trim();
+        }
+        function similitudPalabras(a, b) {
+            const setA = new Set(normalizarTexto(a).split(' '));
+            const setB = new Set(normalizarTexto(b).split(' '));
+            const inter = new Set([...setA].filter(x => setB.has(x)));
+            const union = new Set([...setA, ...setB]);
+            return union.size === 0 ? 0 : inter.size / union.size;
         }
         function agruparEventosAvanzado(eventos) {
             const agrupados = [];
             for (const ev of eventos) {
+                const tituloSinPrefijo = quitarPrefijoTitulo(ev.title);
                 const horario = ev.time;
                 let encontrado = false;
                 for (const grupo of agrupados) {
                     if (grupo.time === horario) {
-                        // Coincidencia exacta de equipos (sin importar orden ni prefijos)
-                        if (equiposCoinciden(grupo, ev)) {
+                        if (quitarPrefijoTitulo(grupo.title) === tituloSinPrefijo) {
                             grupo.options.push(...ev.options);
                             grupo.buttons.push(...ev.buttons);
-                            // El título será el más largo (con prefijo)
-                            if (ev.title.length > grupo.title.length) {
-                                grupo.title = ev.title;
+                            if (grupo.title !== ev.title) {
+                                grupo.title = grupo.title.includes(':') ? grupo.title : ev.title;
                             }
                             encontrado = true;
                             break;
                         }
-                        // Similitud ≥ 0.75 (fallback)
-                        if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), quitarPrefijoTitulo(ev.title)) >= 0.75) {
+                        if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), tituloSinPrefijo) >= 0.75) {
                             grupo.options.push(...ev.options);
                             grupo.buttons.push(...ev.buttons);
-                            // El título será el más largo (con prefijo)
-                            if (ev.title.length > grupo.title.length) {
-                                grupo.title = ev.title;
+                            if (!grupo.title.includes(ev.title)) {
+                                grupo.title = `${grupo.title} / ${ev.title}`;
                             }
                             encontrado = true;
                             break;
