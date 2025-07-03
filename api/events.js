@@ -611,25 +611,68 @@ export default async (req, res) => {
             return event;
         });
 
-        // Función para quitar prefijos del título (todo hasta el primer ': ')
+        // --- AGRUPACIÓN AVANZADA DE EVENTOS ---
+        // 1. Quitar prefijos para comparar
         function quitarPrefijoTitulo(titulo) {
             if (!titulo) return '';
             const partes = titulo.split(': ');
             return partes.length > 1 ? partes.slice(1).join(': ').trim() : titulo.trim();
         }
-
-        // Ordenar eventos por hora y luego por título sin prefijo
-        adaptedEvents.sort((a, b) => {
-            if (a.time === b.time) {
-                const tituloA = quitarPrefijoTitulo(a.title).toLowerCase();
-                const tituloB = quitarPrefijoTitulo(b.title).toLowerCase();
-                return tituloA.localeCompare(tituloB, 'es');
+        // 2. Normalizar texto para similitud
+        function normalizarTexto(txt) {
+            return txt.toLowerCase().replace(/[^a-z0-9áéíóúüñ\s]/gi, '').replace(/\s+/g, ' ').trim();
+        }
+        // 3. Calcular similitud de palabras (Jaccard)
+        function similitudPalabras(a, b) {
+            const setA = new Set(normalizarTexto(a).split(' '));
+            const setB = new Set(normalizarTexto(b).split(' '));
+            const inter = new Set([...setA].filter(x => setB.has(x)));
+            const union = new Set([...setA, ...setB]);
+            return union.size === 0 ? 0 : inter.size / union.size;
+        }
+        // 4. Agrupar eventos por hora y similitud de título
+        const agrupados = [];
+        for (const ev of adaptedEvents) {
+            const tituloSinPrefijo = quitarPrefijoTitulo(ev.title);
+            const horario = ev.time;
+            // Buscar si ya hay un grupo compatible
+            let encontrado = false;
+            for (const grupo of agrupados) {
+                // Coincide horario
+                if (grupo.time === horario) {
+                    // Coincidencia exacta de título sin prefijo
+                    if (quitarPrefijoTitulo(grupo.title) === tituloSinPrefijo) {
+                        // Unir opciones y botones
+                        grupo.options.push(...ev.options);
+                        grupo.buttons.push(...ev.buttons);
+                        // El título mostrado será el prefijo + evento (el que tiene prefijo)
+                        if (grupo.title !== ev.title) {
+                            grupo.title = grupo.title.includes(':') ? grupo.title : ev.title;
+                        }
+                        encontrado = true;
+                        break;
+                    }
+                    // Similitud ≥ 0.75
+                    if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), tituloSinPrefijo) >= 0.75) {
+                        // Unir opciones y botones
+                        grupo.options.push(...ev.options);
+                        grupo.buttons.push(...ev.buttons);
+                        // El título será ambos títulos unidos por /
+                        if (!grupo.title.includes(ev.title)) {
+                            grupo.title = `${grupo.title} / ${ev.title}`;
+                        }
+                        encontrado = true;
+                        break;
+                    }
+                }
             }
-            return a.time.localeCompare(b.time);
-        });
-
-        // Devolver respuesta
-        return res.status(200).json(adaptedEvents);
+            if (!encontrado) {
+                // Nuevo grupo
+                agrupados.push({ ...ev, options: [...ev.options], buttons: [...ev.buttons] });
+            }
+        }
+        // Devolver respuesta agrupada
+        return res.status(200).json(agrupados);
     } catch (error) {
         console.error('Error en la función principal:', error);
         return res.status(500).json({ error: 'Error interno del servidor' });
