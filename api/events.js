@@ -650,7 +650,7 @@ export default async (req, res) => {
             }
         });
 
-        // --- AGRUPACIÓN AVANZADA DE EVENTOS (idéntica al frontend) ---
+        // --- AGRUPACIÓN AVANZADA DE EVENTOS (idéntica al frontend, ahora con tolerancia de 15min) ---
         function quitarPrefijoTitulo(titulo) {
             if (!titulo) return '';
             const partes = titulo.split(': ');
@@ -681,30 +681,41 @@ export default async (req, res) => {
             const eq2 = extraerEquipos(ev2.title);
             return eq1.length === eq2.length && eq1.every((e, i) => e === eq2[i]);
         }
+        function minutosDiferencia(t1, t2) {
+            const [h1, m1] = t1.split(':').map(Number);
+            const [h2, m2] = t2.split(':').map(Number);
+            return Math.abs((h1 * 60 + m1) - (h2 * 60 + m2));
+        }
         const agrupados = [];
         for (const ev of adaptedEvents) {
-            const horario = ev.time;
             let encontrado = false;
             for (const grupo of agrupados) {
-                if (grupo.time === horario) {
-                    if (equiposCoinciden(grupo, ev)) {
-                        grupo.options.push(...ev.options);
-                        grupo.buttons.push(...ev.buttons);
-                        if (ev.title.length > grupo.title.length) {
-                            grupo.title = ev.title;
-                        }
-                        encontrado = true;
-                        break;
+                // Unificar si equipos coinciden y la diferencia de horario es <= 15min
+                if (equiposCoinciden(grupo, ev) && minutosDiferencia(grupo.time, ev.time) <= 15) {
+                    grupo.options.push(...ev.options);
+                    grupo.buttons.push(...ev.buttons);
+                    if (ev.title.length > grupo.title.length) {
+                        grupo.title = ev.title;
                     }
-                    if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), quitarPrefijoTitulo(ev.title)) >= 0.75) {
-                        grupo.options.push(...ev.options);
-                        grupo.buttons.push(...ev.buttons);
-                        if (ev.title.length > grupo.title.length) {
-                            grupo.title = ev.title;
-                        }
-                        encontrado = true;
-                        break;
+                    // El horario del grupo será el más temprano
+                    if (ev.time < grupo.time) {
+                        grupo.time = ev.time;
                     }
+                    encontrado = true;
+                    break;
+                }
+                // Fallback: similitud ≥ 0.75 y diferencia de horario <= 15min
+                if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), quitarPrefijoTitulo(ev.title)) >= 0.75 && minutosDiferencia(grupo.time, ev.time) <= 15) {
+                    grupo.options.push(...ev.options);
+                    grupo.buttons.push(...ev.buttons);
+                    if (ev.title.length > grupo.title.length) {
+                        grupo.title = ev.title;
+                    }
+                    if (ev.time < grupo.time) {
+                        grupo.time = ev.time;
+                    }
+                    encontrado = true;
+                    break;
                 }
             }
             if (!encontrado) {
@@ -714,7 +725,7 @@ export default async (req, res) => {
         // Asignar imagen de alangulotv solo después de agrupar
         for (const grupo of agrupados) {
             for (const ev of adaptedEvents) {
-                if (grupo.time === ev.time && equiposCoinciden(grupo, ev) && ev.source === 'alangulotv' && ev.image) {
+                if (minutosDiferencia(grupo.time, ev.time) <= 15 && equiposCoinciden(grupo, ev) && ev.source === 'alangulotv' && ev.image) {
                     grupo.image = ev.image;
                     break;
                 }

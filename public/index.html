@@ -549,32 +549,41 @@
                 const eq2 = extraerEquipos(ev2.title);
                 return eq1.length === eq2.length && eq1.every((e, i) => e === eq2[i]);
             }
+            function minutosDiferencia(t1, t2) {
+                const [h1, m1] = t1.split(':').map(Number);
+                const [h2, m2] = t2.split(':').map(Number);
+                return Math.abs((h1 * 60 + m1) - (h2 * 60 + m2));
+            }
             for (const ev of eventos) {
-                const horario = ev.time;
                 let encontrado = false;
                 for (const grupo of agrupados) {
-                    if (grupo.time === horario) {
-                        // Coincidencia exacta de equipos (sin importar orden ni prefijos)
-                        if (equiposCoinciden(grupo, ev)) {
-                            grupo.options.push(...ev.options);
-                            grupo.buttons.push(...ev.buttons);
-                            // El título será el más largo (con prefijo)
-                            if (ev.title.length > grupo.title.length) {
-                                grupo.title = ev.title;
-                            }
-                            encontrado = true;
-                            break;
+                    // Unificar si equipos coinciden y la diferencia de horario es <= 15min
+                    if (equiposCoinciden(grupo, ev) && minutosDiferencia(grupo.time, ev.time) <= 15) {
+                        grupo.options.push(...ev.options);
+                        grupo.buttons.push(...ev.buttons);
+                        // El título será el más largo (con prefijo)
+                        if (ev.title.length > grupo.title.length) {
+                            grupo.title = ev.title;
                         }
-                        // Similitud ≥ 0.75 (fallback)
-                        if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), quitarPrefijoTitulo(ev.title)) >= 0.75) {
-                            grupo.options.push(...ev.options);
-                            grupo.buttons.push(...ev.buttons);
-                            if (ev.title.length > grupo.title.length) {
-                                grupo.title = ev.title;
-                            }
-                            encontrado = true;
-                            break;
+                        // El horario del grupo será el más temprano
+                        if (ev.time < grupo.time) {
+                            grupo.time = ev.time;
                         }
+                        encontrado = true;
+                        break;
+                    }
+                    // Fallback: similitud ≥ 0.75 y diferencia de horario <= 15min
+                    if (!encontrado && similitudPalabras(quitarPrefijoTitulo(grupo.title), quitarPrefijoTitulo(ev.title)) >= 0.75 && minutosDiferencia(grupo.time, ev.time) <= 15) {
+                        grupo.options.push(...ev.options);
+                        grupo.buttons.push(...ev.buttons);
+                        if (ev.title.length > grupo.title.length) {
+                            grupo.title = ev.title;
+                        }
+                        if (ev.time < grupo.time) {
+                            grupo.time = ev.time;
+                        }
+                        encontrado = true;
+                        break;
                     }
                 }
                 if (!encontrado) {
