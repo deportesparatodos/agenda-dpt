@@ -587,11 +587,11 @@ export default async (req, res) => {
         });
 
         // Alinear y corregir botones especiales
-        const adaptedEvents = Array.from(eventMap.values()).map(event => {
+        let adaptedEvents = Array.from(eventMap.values()).map(event => {
             // Asegurar que buttons y options tengan la misma longitud
             if (!event.buttons) event.buttons = [];
             while (event.buttons.length < event.options.length) {
-                event.buttons.push('CANAL');
+                event.buttons.push(undefined);
             }
             // Corregir textos especiales y nunca dejar 'OPCION' para los links especiales
             event.options.forEach((opt, idx) => {
@@ -602,37 +602,58 @@ export default async (req, res) => {
                     event.buttons[idx] = 'TELEMETRIA OFICIAL';
                 }
             });
-            // Si algún botón es 'OPCION', reemplazarlo por 'CANAL' salvo que sea especial
-            event.buttons = event.buttons.map((btn, idx) => {
-                if (!btn || btn.toUpperCase().includes('OPCION')) {
-                    if (event.options[idx] === 'https://alangulotv.live/canal/multi-f1/') return 'MULTICAM (ALANGULOTV)';
-                    if (event.options[idx] === 'https://alangulo-dashboard-f1.vercel.app/') return 'TELEMETRIA OFICIAL';
-                    return 'CANAL';
-                }
-                return btn;
-            });
-            // Indicador de estado (Buenos Aires UTC-3)
-            try {
-                const [hour, minute] = event.time.split(':').map(Number);
-                const eventDate = event.date || new Date().toISOString().split('T')[0];
-                // Crear fecha de inicio en Buenos Aires
-                const start = new Date(`${eventDate}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00-03:00`);
-                const now = new Date();
-                // Convertir now a Buenos Aires (UTC-3)
-                const nowBuenosAires = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
-                const diffMs = nowBuenosAires - start;
-                if (diffMs < 0) {
-                    event.status = 'Próximo';
-                } else if (diffMs <= 3 * 60 * 60 * 1000) {
-                    event.status = 'En vivo';
-                } else {
-                    event.status = 'Finalizado';
-                }
-            } catch (e) {
-                event.status = undefined;
+            // Para eventos de streamtpglobal: si no hay nombre, usar el valor del parámetro stream del link
+            if (event.source === 'streamtpglobal') {
+                event.options.forEach((opt, idx) => {
+                    if (!event.buttons[idx] || event.buttons[idx].toUpperCase() === 'CANAL' || event.buttons[idx].toUpperCase() === 'OPCION') {
+                        if (typeof opt === 'string') {
+                            const match = opt.match(/[?&]stream=([^&#]+)/i);
+                            if (match && match[1]) {
+                                event.buttons[idx] = match[1];
+                            } else {
+                                // Si no hay parámetro stream, usar el último segmento del link
+                                try {
+                                    const urlObj = new URL(opt);
+                                    const last = urlObj.pathname.split('/').filter(Boolean).pop();
+                                    event.buttons[idx] = last || 'ENLACE';
+                                } catch {
+                                    event.buttons[idx] = 'ENLACE';
+                                }
+                            }
+                        } else {
+                            event.buttons[idx] = 'ENLACE';
+                        }
+                    }
+                });
             }
+            // Si algún botón sigue vacío, usar el canal detectado del link si es posible
+            event.options.forEach((opt, idx) => {
+                if (!event.buttons[idx] || event.buttons[idx].toUpperCase() === 'CANAL' || event.buttons[idx].toUpperCase() === 'OPCION') {
+                    if (typeof opt === 'string') {
+                        const urlObj = new URL(opt, 'https://dummy.base');
+                        const channel = urlObj.searchParams.get('channel');
+                        if (channel) {
+                            event.buttons[idx] = channel;
+                        } else {
+                            // Si no hay channel, usar el último segmento del path
+                            const last = urlObj.pathname.split('/').filter(Boolean).pop();
+                            event.buttons[idx] = last || 'ENLACE';
+                        }
+                    } else {
+                        event.buttons[idx] = 'ENLACE';
+                    }
+                }
+            });
+            // Eliminar botones y opciones cuyo link sea undefined o null
+            const filtered = event.options
+                .map((opt, idx) => ({ opt, btn: event.buttons[idx] }))
+                .filter(pair => pair.opt && pair.opt !== 'undefined' && pair.opt !== 'null');
+            event.options = filtered.map(pair => pair.opt);
+            event.buttons = filtered.map(pair => pair.btn);
             return event;
         });
+        // Eliminar eventos sin botones/canales válidos
+        adaptedEvents = adaptedEvents.filter(ev => Array.isArray(ev.options) && ev.options.length > 0 && Array.isArray(ev.buttons) && ev.buttons.length > 0);
 
         // Cambiar todos los enlaces play.alangulotv.live por p.alangulotv.live en la API antes de devolver
         adaptedEvents.forEach(ev => {
