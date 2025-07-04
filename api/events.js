@@ -614,11 +614,16 @@ export default async (req, res) => {
         // Cambiar todos los enlaces play.alangulotv.live por p.alangulotv.live en la API antes de devolver
         adaptedEvents.forEach(ev => {
             if (ev.options && Array.isArray(ev.options)) {
-                ev.options = ev.options.map(link =>
-                    typeof link === 'string' && link.startsWith('https://play.alangulotv.live')
-                        ? link.replace('https://play.alangulotv.live', 'https://p.alangulotv.live')
-                        : link
-                );
+                ev.options = ev.options.map(link => {
+                    if (typeof link === 'string' && link.startsWith('https://play.alangulotv.live')) {
+                        link = link.replace('https://play.alangulotv.live', 'https://p.alangulotv.live');
+                    }
+                    // Reemplazo especial para foxdeportes
+                    if (link === 'https://p.alangulotv.live/?channel=foxdeportes') {
+                        return 'https://p.alangulotv.live/?channel=foxdeportes-a';
+                    }
+                    return link;
+                });
             }
         });
 
