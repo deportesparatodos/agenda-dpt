@@ -448,6 +448,7 @@
                                 <span class="text-sm text-gray-300">${event.time}</span>
                                 ${statusHtml}
                             </div>
+                            ${event.image ? `<img src="${event.image}" alt="Imagen del evento" class="w-full max-h-40 object-contain rounded mb-2">` : ''}
                             <h2 class="text-xl font-semibold text-white">${event.title}</h2>
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -597,6 +598,10 @@
                                 ? link.replace('https://play.alangulotv.live', 'https://p.alangulotv.live')
                                 : link
                         );
+                    }
+                    // Si el evento es de alangulotv, pasar la imagen al objeto agrupado
+                    if (ev.source === 'alangulotv' && ev.image) {
+                        ev.image = ev.image;
                     }
                 });
                 allEvents = agruparEventosAvanzado(eventos);

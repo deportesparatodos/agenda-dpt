@@ -250,7 +250,22 @@ async function fetchAlanGuloTVEvents() {
         $('.match-container').each((index, element) => {
             try {
                 const $container = $(element);
-                
+                // Extraer la imagen principal del evento
+                let imageUrl = '';
+                // Buscar primero .event-logo, si no existe, buscar .team-logo
+                const $eventLogo = $container.find('img.event-logo');
+                if ($eventLogo.length > 0) {
+                    imageUrl = $eventLogo.attr('src') || '';
+                } else {
+                    const $teamLogo = $container.find('img.team-logo');
+                    if ($teamLogo.length > 0) {
+                        imageUrl = $teamLogo.attr('src') || '';
+                    }
+                }
+                // Si la URL es relativa, hacerla absoluta
+                if (imageUrl && imageUrl.startsWith('/')) {
+                    imageUrl = `https://alangulotv.live${imageUrl}`;
+                }
                 // Extraer la hora
                 const timeText = $container.find('.time').text().trim();
                 const time = timeText || '00:00';
@@ -351,7 +366,8 @@ async function fetchAlanGuloTVEvents() {
                             category: 'Deportes',
                             language: 'Español',
                             date: new Date().toISOString().split('T')[0],
-                            source: 'alangulotv'
+                            source: 'alangulotv',
+                            image: imageUrl // NUEVO: imagen del evento
                         });
                     });
                 }
@@ -546,19 +562,19 @@ export default async (req, res) => {
                     category: event.category || 'Sin categoría',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
-                    source: event.source || 'unknown'
+                    source: event.source || 'unknown',
+                    image: event.image || '' // NUEVO: incluir imagen si existe
                 });
             } else {
-                if (event.link) {
-                    eventMap.get(key).options.push(event.link);
-                    if (event.source === 'streamtpglobal') {
-                        const match = event.link.match(/[?&]stream=([^&#]+)/i);
-                        eventMap.get(key).buttons.push(match ? match[1].toUpperCase() : 'CANAL');
-                    } else if (event.button) {
-                        eventMap.get(key).buttons.push(event.button);
-                    } else {
-                        eventMap.get(key).buttons.push('CANAL');
-                    }
+                // Si ya existe, agregar más opciones y botones
+                const existing = eventMap.get(key);
+                if (event.link && !existing.options.includes(event.link)) {
+                    existing.options.push(event.link);
+                    if (event.button) existing.buttons.push(event.button);
+                }
+                // Si no tiene imagen y este evento sí, agregarla
+                if (!existing.image && event.image) {
+                    existing.image = event.image;
                 }
             }
         });
