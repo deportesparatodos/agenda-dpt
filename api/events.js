@@ -651,24 +651,35 @@ export default async (req, res) => {
         });
 
         // --- AGRUPACIÓN AVANZADA DE EVENTOS (idéntica al frontend) ---
-        // Funciones de comparación de títulos restauradas
         function quitarPrefijoTitulo(titulo) {
-            return titulo.replace(/^(Fútbol|Tenis|Básquet|Vóley|Boxeo|Automovilismo|Motociclismo|Ciclismo|Rugby|Golf|Handball|Hockey|Beisbol|MLB|NBA|NFL|NHL|UFC|MMA|eSports|\s)+/i, '').trim();
+            if (!titulo) return '';
+            const partes = titulo.split(': ');
+            return partes.length > 1 ? partes.slice(1).join(': ').trim() : titulo.trim();
         }
-        function equiposCoinciden(ev1, ev2) {
-            if (!ev1.title || !ev2.title) return false;
-            const t1 = quitarPrefijoTitulo(ev1.title).toUpperCase();
-            const t2 = quitarPrefijoTitulo(ev2.title).toUpperCase();
-            return t1 === t2;
+        function normalizarTexto(txt) {
+            return txt.toLowerCase().replace(/[^a-z0-9áéíóúüñ\s]/gi, '').replace(/\s+/g, ' ').trim();
         }
         function similitudPalabras(a, b) {
             if (!a || !b) return 0;
-            const pa = a.toUpperCase().split(/\s+/);
-            const pb = b.toUpperCase().split(/\s+/);
-            const setA = new Set(pa);
-            const setB = new Set(pb);
-            const inter = [...setA].filter(x => setB.has(x));
-            return inter.length / Math.max(pa.length, pb.length);
+            const setA = new Set(normalizarTexto(a).split(' '));
+            const setB = new Set(normalizarTexto(b).split(' '));
+            const inter = new Set([...setA].filter(x => setB.has(x)));
+            const union = new Set([...setA, ...setB]);
+            return union.size === 0 ? 0 : inter.size / union.size;
+        }
+        function extraerEquipos(titulo) {
+            const sinPrefijo = quitarPrefijoTitulo(titulo);
+            const vsMatch = sinPrefijo.match(/(.+?)\s+vs\.?\s+(.+)/i);
+            if (vsMatch) {
+                const norm = s => s.toLowerCase().normalize('NFD').replace(/[\'’`´]/g, "'").replace(/[\u0300-\u036f]/g, '').replace(/\b(fc|old boys|club|deportivo|cd|cf|ac|sc|ca|athletic|united|city|sporting|real|club atlético|atlético|atletico|the|los|las|el|la|de|del|y|and)\b/gi, '').replace(/[^a-z0-9']/g, '').trim();
+                return [norm(vsMatch[1]), norm(vsMatch[2])].sort();
+            }
+            return [sinPrefijo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9']/g, '').trim()];
+        }
+        function equiposCoinciden(ev1, ev2) {
+            const eq1 = extraerEquipos(ev1.title);
+            const eq2 = extraerEquipos(ev2.title);
+            return eq1.length === eq2.length && eq1.every((e, i) => e === eq2[i]);
         }
         const agrupados = [];
         for (const ev of adaptedEvents) {
