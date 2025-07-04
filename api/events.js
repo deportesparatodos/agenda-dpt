@@ -521,6 +521,10 @@ export default async (req, res) => {
         // Procesar eventos: ajustar horarios y agrupar por título y hora
         const eventMap = new Map();
         allEvents.forEach(event => {
+            // Forzar imagen MLB si el título contiene MLB (para cualquier fuente)
+            if (event.title && event.title.toUpperCase().includes('MLB')) {
+                event.image = 'https://p.alangulotv.live/mlb';
+            }
             // Solo procesar eventos que tengan tiempo válido
             if (event.time) {
                 // Extraer hora y minuto
@@ -562,7 +566,7 @@ export default async (req, res) => {
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
                     source: event.source || 'unknown',
-                    image: event.image || '' // NUEVO: incluir imagen si existe
+                    image: event.image || ''
                 });
             } else {
                 // Si ya existe, agregar más opciones y botones
@@ -571,7 +575,11 @@ export default async (req, res) => {
                     existing.options.push(event.link);
                     if (event.button) existing.buttons.push(event.button);
                 }
-                // Si no tiene imagen y este evento sí, agregarla
+                // Si el evento de alangulotv tiene imagen, usar esa imagen para la card unificada
+                if (event.source === 'alangulotv' && event.image) {
+                    existing.image = event.image;
+                }
+                // Si no tiene imagen y este evento sí, agregarla (fallback)
                 if (!existing.image && event.image) {
                     existing.image = event.image;
                 }
@@ -649,7 +657,7 @@ export default async (req, res) => {
             return partes.length > 1 ? partes.slice(1).join(': ').trim() : titulo.trim();
         }
         function normalizarTexto(txt) {
-            return txt.toLowerCase().replace(/[^a-z0-9áéíóúüñ\s]/gi, '').replace(/\s+/g, ' ').trim();
+            return txt.toLowerCase().replace(/[^a0-z9áéíóúüñ\s]/gi, '').replace(/\s+/g, ' ').trim();
         }
         function similitudPalabras(a, b) {
             const setA = new Set(normalizarTexto(a).split(' '));
