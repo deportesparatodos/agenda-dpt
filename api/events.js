@@ -730,6 +730,15 @@ export default async (req, res) => {
                     break;
                 }
             }
+            // Imagen Liga Pro Ecuador: si el título inicia con 'Primera A' o algún canal es ECDF
+            const ligaProImg = 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Football_of_Ecuador_-_Liga_Pro_logo_%28normal%29.svg/1200px-Football_of_Ecuador_-_Liga_Pro_logo_%28normal%29.svg.png';
+            if (grupo.title && grupo.title.trim().toLowerCase().startsWith('primera a')) {
+                grupo.image = ligaProImg;
+            } else if (Array.isArray(grupo.buttons) && grupo.buttons.some(btn => btn && btn.trim().toUpperCase() === 'ECDF')) {
+                grupo.image = ligaProImg;
+            } else if (Array.isArray(grupo.options) && grupo.options.some(opt => typeof opt === 'string' && opt.toLowerCase().includes('ecdf'))) {
+                grupo.image = ligaProImg;
+            }
         }
         return res.status(200).json(agrupados);
     } catch (error) {
