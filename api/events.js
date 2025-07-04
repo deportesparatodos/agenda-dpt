@@ -269,27 +269,26 @@ async function fetchAlanGuloTVEvents() {
                 // Extraer la hora
                 const timeText = $container.find('.time').text().trim();
                 const time = timeText || '00:00';
-                
                 // Extraer nombres de equipos
                 const teamNames = [];
                 $container.find('.team-name').each((i, teamEl) => {
                     teamNames.push($(teamEl).text().trim());
                 });
-                
                 const team1 = teamNames[0] || '';
                 const team2 = teamNames[1] || '';
-                
                 // Crear título principal
                 let title = '';
                 if (team1 && team2) {
                     title = `${team1} vs ${team2}`;
                 } else if (team1) {
-                    // Si solo hay un "team-name", usarlo como título completo
                     title = team1;
                 } else {
                     title = 'Evento sin título';
                 }
-                
+                // FORZAR imagen MLB si el título contiene MLB
+                if (title.toUpperCase().includes('MLB')) {
+                    imageUrl = 'https://p.alangulotv.live/mlb';
+                }
                 // Buscar el contenedor de enlaces (siguiente elemento hermano)
                 const $linksContainer = $container.next('.links-container');
                 const links = [];
