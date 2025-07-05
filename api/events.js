@@ -774,11 +774,19 @@ export default async (req, res) => {
             }
             // 3. Si el título contiene Copa Argentina
             else if (grupo.title && grupo.title.toLowerCase().includes('copa argentina')) {
-                grupo.image = 'https://static.wikia.nocookie.net/logopedia/images/5/5d/CopaArg_2012_isotipo.png/revision/latest?cb=20230807035559&path-prefix=es';
+                grupo.image = 'https://paladarnegro.net/escudoteca/copas/copasnacionales/png/copaargentina.png';
             }
             // 4. Si el título contiene Primera B Metropolitana
             else if (grupo.title && grupo.title.toLowerCase().includes('primera b metropolitana')) {
                 grupo.image = 'https://images.fotmob.com/image_resources/logo/leaguelogo/9213.png';
+            }
+            // 5. Si el título contiene Mundial de Clubes
+            else if (grupo.title && grupo.title.toLowerCase().includes('mundial de clubes')) {
+                grupo.image = 'https://p.alangulotv.live/copamundialdeclubes';
+            }
+            // 6. Si el título contiene UFC
+            else if (grupo.title && grupo.title.toUpperCase().includes('UFC')) {
+                grupo.image = 'https://upload.wikimedia.org/wikipedia/commons/d/d7/UFC_Logo.png';
             }
         }
 
