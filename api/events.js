@@ -774,7 +774,7 @@ export default async (req, res) => {
             }
             // 3. Si el título contiene Copa Argentina
             else if (grupo.title && grupo.title.toLowerCase().includes('copa argentina')) {
-                grupo.image = 'https://paladarnegro.net/escudoteca/copas/copasnacionales/png/copaargentina.png';
+                grupo.image = 'https://p.alangulotv.live/copaargentina';
             }
             // 4. Si el título contiene Primera B Metropolitana
             else if (grupo.title && grupo.title.toLowerCase().includes('primera b metropolitana')) {
