@@ -790,6 +790,30 @@ export default async (req, res) => {
             }
         }
 
+        // --- AGREGAR 2 EVENTOS DE F1 PARA TESTEO ---
+        agrupados.push({
+            time: '14:00',
+            title: 'F1 Gran Premio de Austria',
+            options: ['https://p.alangulotv.live/?channel=f1-a'],
+            buttons: ['F1-A'],
+            category: 'Deportes',
+            language: 'Español',
+            date: new Date().toISOString().split('T')[0],
+            source: 'test',
+            image: 'https://p.alangulotv.live/f1'
+        });
+        agrupados.push({
+            time: '17:00',
+            title: 'F1 Clasificación Silverstone',
+            options: ['https://p.alangulotv.live/?channel=f1-b'],
+            buttons: ['F1-B'],
+            category: 'Deportes',
+            language: 'Español',
+            date: new Date().toISOString().split('T')[0],
+            source: 'test',
+            image: 'https://p.alangulotv.live/f1'
+        });
+
         return res.status(200).json(agrupados);
     } catch (error) {
         console.error('Error en la función principal:', error);
