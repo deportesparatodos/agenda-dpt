@@ -788,6 +788,10 @@ export default async (req, res) => {
             else if (grupo.title && grupo.title.toUpperCase().includes('UFC')) {
                 grupo.image = 'https://i.ibb.co/chR144x9/boxing-glove-emoji-clipart-md.png';
             }
+            // 7. Si no tiene imagen, poner imagen por defecto
+            if (!grupo.image) {
+                grupo.image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
+            }
         }
 
         return res.status(200).json(agrupados);
