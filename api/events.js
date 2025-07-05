@@ -786,7 +786,7 @@ export default async (req, res) => {
             }
             // 6. Si el título contiene UFC
             else if (grupo.title && grupo.title.toUpperCase().includes('UFC')) {
-                grupo.image = 'https://upload.wikimedia.org/wikipedia/commons/d/d7/UFC_Logo.png';
+                grupo.image = 'https://cdn.creazilla.com/emojis/43765/boxing-glove-emoji-clipart-md.png';
             }
         }
 
