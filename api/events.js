@@ -761,6 +761,27 @@ export default async (req, res) => {
                 grupo.image = ligaProImg;
             }
         }
+
+        // --- REGLAS DE IMAGEN PERSONALIZADA SEGÚN TU PEDIDO ---
+        for (const grupo of agrupados) {
+            // 1. Si algún botón es LIGA1MAX
+            if (Array.isArray(grupo.buttons) && grupo.buttons.some(btn => btn && btn.trim().toUpperCase() === 'LIGA1MAX')) {
+                grupo.image = 'https://a.espncdn.com/combiner/i?img=%2Fi%2Fleaguelogos%2Fsoccer%2F500%2F1813.png';
+            }
+            // 2. Si el título contiene F1
+            else if (grupo.title && grupo.title.toUpperCase().includes('F1')) {
+                grupo.image = 'https://p.alangulotv.live/f1';
+            }
+            // 3. Si el título contiene Copa Argentina
+            else if (grupo.title && grupo.title.toLowerCase().includes('copa argentina')) {
+                grupo.image = 'https://static.wikia.nocookie.net/logopedia/images/5/5d/CopaArg_2012_isotipo.png/revision/latest?cb=20230807035559&path-prefix=es';
+            }
+            // 4. Si el título contiene Primera B Metropolitana
+            else if (grupo.title && grupo.title.toLowerCase().includes('primera b metropolitana')) {
+                grupo.image = 'https://images.fotmob.com/image_resources/logo/leaguelogo/9213.png';
+            }
+        }
+
         return res.status(200).json(agrupados);
     } catch (error) {
         console.error('Error en la función principal:', error);
