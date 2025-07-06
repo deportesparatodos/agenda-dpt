@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 
 /**
  * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
- * Esto evita tener que cambiar manually los dominios cuando expiran.
+ * Esto evita tener que cambiar manualmente los dominios cuando expiran.
  */
 async function getDynamicAlanGuloConfig() {
     const mainUrl = 'https://alangulotv.live';
@@ -17,17 +17,20 @@ async function getDynamicAlanGuloConfig() {
         });
         const finalUrl = new URL(response.url);
         const baseOrigin = finalUrl.origin; // e.g., https://alangulotv.space
-        const agendaUrl = `${baseOrigin}/agenda-2/`;
+        
+        // FIX: The actual content is in /agenda/, not /agenda-2/
+        const agendaUrl = `${baseOrigin}/agenda/`; 
         const linkDomain = `p.${finalUrl.hostname}`; // e.g., p.alangulotv.space
 
         console.log(`Dominio de AlanGuloTV detectado: ${baseOrigin}`);
+        console.log(`URL de la agenda a scrapear: ${agendaUrl}`);
 
         return { baseOrigin, agendaUrl, linkDomain };
     } catch (error) {
         console.error('No se pudo obtener el dominio dinámico de AlanGuloTV. Usando valores por defecto.', error);
         // Fallback a los últimos dominios conocidos para no romper la API
         const baseOrigin = 'https://alangulotv.space';
-        const agendaUrl = `${baseOrigin}/agenda-2/`;
+        const agendaUrl = `${baseOrigin}/agenda/`; // Usar la URL correcta en el fallback también
         const linkDomain = 'p.alangulotv.space';
         return { baseOrigin, agendaUrl, linkDomain };
     }
@@ -107,7 +110,6 @@ async function fetchAlanGuloTVEvents(config) {
 
         const html = await response.text();
         const $ = cheerio.load(html);
-        const events = [];
 
         // Usamos un array de promesas para procesar todos los eventos en paralelo
         const eventPromises = [];
@@ -118,10 +120,15 @@ async function fetchAlanGuloTVEvents(config) {
                     const $container = $(element);
                     
                     // 1. Extraer datos básicos del evento
-                    let imageUrl = $container.find('img.event-logo, img.team-logo').first().attr('src') || '';
-                     if (imageUrl && imageUrl.startsWith('/')) {
-                        // Las imágenes de eventos a menudo están en el dominio 'p.'
-                        imageUrl = `https://${linkDomain}${imageUrl}`;
+                    // FIX: Priorizar el event-logo, y si no existe, usar el team-logo.
+                    let imageUrl = $container.find('img.event-logo').attr('src');
+                    if (!imageUrl) {
+                        imageUrl = $container.find('img.team-logo').first().attr('src') || '';
+                    }
+                    
+                    // Asegurarse de que la URL de la imagen sea absoluta
+                    if (imageUrl && !imageUrl.startsWith('http')) {
+                         imageUrl = new URL(imageUrl, baseOrigin).href;
                     }
                     
                     const time = $container.find('.time').text().trim() || '00:00';
@@ -177,8 +184,6 @@ async function fetchAlanGuloTVEvents(config) {
                         };
                     }
                     
-                    // FIX 3: Devolver null explícitamente si no se encontraron opciones válidas.
-                    // Esto evita que la promesa se resuelva como 'undefined'.
                     return null;
 
                 } catch (error) {
@@ -228,12 +233,8 @@ export default async (req, res) => {
         if (streamTpEventsResult.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEventsResult.reason);
         if (alanGuloEventsResult.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEventsResult.reason);
 
-        // Aplanar los eventos de AlanGuloTV, ya que ahora vienen con `options` y `buttons`
-        const flattenedAlanEvents = [];
-        alanEvents.forEach(event => {
-            // El evento ya tiene la estructura correcta con `options` y `buttons`
-            flattenedAlanEvents.push(event);
-        });
+        // Aplanar los eventos de AlanGuloTV, que ya vienen con la estructura correcta
+        const flattenedAlanEvents = alanEvents;
         
         // Aplanar los eventos de StreamTpGlobal para que coincidan con la estructura
         const flattenedStreamEvents = [];
@@ -284,7 +285,6 @@ export default async (req, res) => {
         }
         
         function equiposCoinciden(ev1, ev2) {
-            // FIX 2: Añadir guarda para evitar errores con objetos inválidos o sin título.
             if (!ev1 || !ev2 || typeof ev1.title !== 'string' || typeof ev2.title !== 'string') {
                 return false;
             }
@@ -303,8 +303,6 @@ export default async (req, res) => {
 
         const agrupados = [];
         for (const ev of allEvents) {
-            // FIX 1: Añadir una guarda para saltar eventos inválidos o sin título.
-            // Esto previene el error 'Cannot read properties of undefined'.
             if (!ev || typeof ev.title !== 'string') {
                 console.warn('Saltando evento inválido o sin título:', ev);
                 continue;
@@ -324,7 +322,7 @@ export default async (req, res) => {
                 }
             }
             if (!encontrado) {
-                agrupados.push({ ...ev });
+                agrupados.push({ ...ev, options: [...(ev.options || [])], buttons: [...(ev.buttons || [])] });
             }
         }
         
