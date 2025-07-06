@@ -663,6 +663,10 @@ export default async (req, res) => {
         adaptedEvents.forEach(ev => {
             if (ev.options && Array.isArray(ev.options)) {
                 ev.options = ev.options.map(link => {
+                    // Reemplazo especial para disneysiestsenpcwindowsusaestaextensinsoloarg
+                    if (link === 'https://p.alangulotv.space/?channel=disneysiestsenpcwindowsusaestaextensinsoloarg') {
+                        return 'https://p.alangulotv.space/?channel=transmi1';
+                    }
                     if (typeof link === 'string' && link.startsWith('https://play.alangulotv.live')) {
                         link = link.replace('https://play.alangulotv.live', 'https://p.alangulotv.space');
                     }
