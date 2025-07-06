@@ -3,39 +3,33 @@ import * as cheerio from 'cheerio';
 
 /**
  * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
- * Esto evita tener que cambiar manualmente los dominios cuando expiran.
  */
 async function getDynamicAlanGuloConfig() {
     const mainUrl = 'https://alangulotv.live';
     try {
         const response = await fetch(mainUrl, {
-            redirect: 'follow', // Sigue las redirecciones automáticamente
+            redirect: 'follow',
             timeout: 15000,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
         });
         const finalUrl = new URL(response.url);
-        const baseOrigin = finalUrl.origin; // e.g., https://alangulotv.space
-        
-        // FIX: The actual content is in /agenda/, not /agenda-2/
-        const agendaUrl = `${baseOrigin}/agenda/`; 
-        const linkDomain = `p.${finalUrl.hostname}`; // e.g., p.alangulotv.space
+        const baseOrigin = finalUrl.origin;
+        // La página de entrada que contiene el iframe de la agenda
+        const entryUrl = `${baseOrigin}/agenda-2/`;
+        const linkDomain = `p.${finalUrl.hostname}`;
 
         console.log(`Dominio de AlanGuloTV detectado: ${baseOrigin}`);
-        console.log(`URL de la agenda a scrapear: ${agendaUrl}`);
-
-        return { baseOrigin, agendaUrl, linkDomain };
+        return { baseOrigin, entryUrl, linkDomain };
     } catch (error) {
         console.error('No se pudo obtener el dominio dinámico de AlanGuloTV. Usando valores por defecto.', error);
-        // Fallback a los últimos dominios conocidos para no romper la API
         const baseOrigin = 'https://alangulotv.space';
-        const agendaUrl = `${baseOrigin}/agenda/`; // Usar la URL correcta en el fallback también
+        const entryUrl = `${baseOrigin}/agenda-2/`;
         const linkDomain = 'p.alangulotv.space';
-        return { baseOrigin, agendaUrl, linkDomain };
+        return { baseOrigin, entryUrl, linkDomain };
     }
 }
-
 
 /**
  * Función para hacer scraping de streamtpglobal.com (sin cambios)
@@ -58,17 +52,16 @@ async function fetchStreamTpGlobalEvents() {
 }
 
 /**
- * NUEVA LÓGICA: Extrae el iframe final de cada página de canal.
- * @param {string} channelPageUrl - La URL de la página del canal (ej: /canal/espn/)
- * @param {object} config - El objeto de configuración con baseOrigin.
- * @returns {Promise<string|null>} La URL del src del iframe o null si no se encuentra.
+ * Extrae el iframe final de cada página de canal.
  */
 async function fetchFinalIframeSrc(channelPageUrl, config) {
     try {
-        // Asegurarse de que la URL sea absoluta
         const absoluteUrl = new URL(channelPageUrl, config.baseOrigin).href;
         const response = await fetch(absoluteUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': config.agendaUrl // Usa la URL de la agenda real como referer
+            },
             timeout: 10000
         });
         if (!response.ok) return null;
@@ -76,57 +69,66 @@ async function fetchFinalIframeSrc(channelPageUrl, config) {
         const html = await response.text();
         const $ = cheerio.load(html);
         
-        // Buscar el iframe principal y devolver su src
         const iframeSrc = $('#mainIframe').attr('src');
         
-        // Si el src es relativo (ej: /?channel=...), hacerlo absoluto
         if (iframeSrc && iframeSrc.startsWith('/')) {
             return `https://${config.linkDomain}${iframeSrc}`;
         }
         
         return iframeSrc || null;
-
     } catch (error) {
         console.error(`Error al scrapear la página del canal ${channelPageUrl}:`, error);
         return null;
     }
 }
 
-
 /**
- * NUEVA LÓGICA: Función para hacer scraping de alangulotv.
- * 1. Scrapea la agenda.
- * 2. Para cada evento, visita las páginas de los canales para obtener el iframe final.
+ * NUEVA LÓGICA REVISADA: Función para hacer scraping de alangulotv.
  */
 async function fetchAlanGuloTVEvents(config) {
-    const { agendaUrl, baseOrigin, linkDomain } = config;
+    const { entryUrl, baseOrigin, linkDomain } = config;
     try {
-        console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
+        // 1. Ir a la página /agenda-2/ para encontrar el iframe
+        console.log(`Fetching AlanGuloTV entry page desde ${entryUrl}...`);
+        const entryResponse = await fetch(entryUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+        });
+        if (!entryResponse.ok) throw new Error(`HTTP ${entryResponse.status} en la página de entrada`);
+        
+        const entryHtml = await entryResponse.text();
+        const $entry = cheerio.load(entryHtml);
+
+        // 2. Extraer la URL real de la agenda desde el src del iframe
+        const agendaIframeSrc = $entry('.iframe-container iframe').attr('src');
+        if (!agendaIframeSrc) {
+            throw new Error('No se pudo encontrar el iframe de la agenda en /agenda-2/');
+        }
+        const agendaUrl = new URL(agendaIframeSrc, baseOrigin).href;
+        console.log(`URL real de la agenda encontrada: ${agendaUrl}`);
+
+        // 3. Ahora, hacer fetch a la página de la agenda real
         const response = await fetch(agendaUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': entryUrl // Importante: Usar la página padre como Referer
+            },
             timeout: 15000
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status} en la página de agenda real`);
 
         const html = await response.text();
         const $ = cheerio.load(html);
 
-        // Usamos un array de promesas para procesar todos los eventos en paralelo
         const eventPromises = [];
-
         $('.match-container').each((index, element) => {
             const promise = (async () => {
                 try {
                     const $container = $(element);
                     
-                    // 1. Extraer datos básicos del evento
-                    // FIX: Priorizar el event-logo, y si no existe, usar el team-logo.
                     let imageUrl = $container.find('img.event-logo').attr('src');
                     if (!imageUrl) {
                         imageUrl = $container.find('img.team-logo').first().attr('src') || '';
                     }
-                    
-                    // Asegurarse de que la URL de la imagen sea absoluta
                     if (imageUrl && !imageUrl.startsWith('http')) {
                          imageUrl = new URL(imageUrl, baseOrigin).href;
                     }
@@ -136,12 +138,10 @@ async function fetchAlanGuloTVEvents(config) {
                     $container.find('.team-name').each((i, el) => teamNames.push($(el).text().trim()));
                     const title = teamNames.length >= 2 ? `${teamNames[0]} vs ${teamNames[1]}` : teamNames[0] || 'Evento sin título';
 
-                    // Forzar imagen MLB
                     if (title.toUpperCase().includes('MLB')) {
                         imageUrl = `https://${linkDomain}/mlb`;
                     }
 
-                    // 2. Encontrar los botones y sus enlaces a las páginas de canal
                     const $linksContainer = $container.next('.links-container');
                     const channelLinks = [];
                     $linksContainer.find('.link-button, a').each((i, linkEl) => {
@@ -155,37 +155,24 @@ async function fetchAlanGuloTVEvents(config) {
 
                     if (channelLinks.length === 0) return null;
 
-                    // 3. Scrapear cada página de canal para obtener el iframe final
-                    const iframeSrcPromises = channelLinks.map(link => fetchFinalIframeSrc(link.pageUrl, config));
+                    const configForSubFetch = { ...config, agendaUrl }; // Pasar la URL de la agenda como referer
+                    const iframeSrcPromises = channelLinks.map(link => fetchFinalIframeSrc(link.pageUrl, configForSubFetch));
                     const finalIframeSrcs = await Promise.all(iframeSrcPromises);
 
-                    // 4. Filtrar los resultados y crear el objeto de evento
                     const options = [];
                     const buttons = [];
                     finalIframeSrcs.forEach((src, i) => {
-                        if (src) { // Solo añadir si el scraping del iframe fue exitoso
+                        if (src) {
                             options.push(src);
                             buttons.push(channelLinks[i].buttonName);
                         }
                     });
                     
-                    // Solo agregar el evento si tiene al menos una opción válida
                     if (options.length > 0) {
-                        return {
-                            time,
-                            title,
-                            options, // Array de URLs de iframes finales
-                            buttons, // Array de nombres de botones
-                            category: 'Deportes',
-                            language: 'Español',
-                            date: new Date().toISOString().split('T')[0],
-                            source: 'alangulotv',
-                            image: imageUrl
-                        };
+                        return { time, title, options, buttons, category: 'Deportes', language: 'Español', date: new Date().toISOString().split('T')[0], source: 'alangulotv', image: imageUrl };
                     }
                     
                     return null;
-
                 } catch (error) {
                     console.error('Error procesando un evento de AlanGuloTV:', error);
                     return null;
@@ -195,21 +182,17 @@ async function fetchAlanGuloTVEvents(config) {
         });
 
         const resolvedEvents = await Promise.all(eventPromises);
-        // Filtrar cualquier evento que haya resultado en null (o undefined)
         const validEvents = resolvedEvents.filter(Boolean);
 
         console.log(`AlanGuloTV: ${validEvents.length} eventos obtenidos con la nueva lógica.`);
         return validEvents;
-
     } catch (error) {
         console.error('Error grave al obtener eventos de AlanGuloTV:', error);
         return [];
     }
 }
 
-
 export default async (req, res) => {
-    // Configurar CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -233,16 +216,13 @@ export default async (req, res) => {
         if (streamTpEventsResult.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEventsResult.reason);
         if (alanGuloEventsResult.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEventsResult.reason);
 
-        // Aplanar los eventos de AlanGuloTV, que ya vienen con la estructura correcta
         const flattenedAlanEvents = alanEvents;
         
-        // Aplanar los eventos de StreamTpGlobal para que coincidan con la estructura
         const flattenedStreamEvents = [];
         streamEvents.forEach(event => {
             const match = event.link ? event.link.match(/[?&]stream=([^&#]+)/i) : null;
             const buttonName = match ? match[1].toUpperCase() : 'CANAL';
             
-            // Ajustar hora de StreamTpGlobal
             let adjustedTime = event.time || '00:00';
             const timeParts = adjustedTime.split(':');
             if (timeParts.length >= 2) {
@@ -255,17 +235,7 @@ export default async (req, res) => {
                 }
             }
 
-            flattenedStreamEvents.push({
-                time: adjustedTime,
-                title: event.title,
-                options: [event.link],
-                buttons: [buttonName],
-                category: event.category,
-                language: event.language,
-                date: event.date,
-                source: 'streamtpglobal',
-                image: event.image || ''
-            });
+            flattenedStreamEvents.push({ time: adjustedTime, title: event.title, options: [event.link], buttons: [buttonName], category: event.category, language: event.language, date: event.date, source: 'streamtpglobal', image: event.image || '' });
         });
 
         const allEvents = [...flattenedStreamEvents, ...flattenedAlanEvents];
@@ -275,8 +245,6 @@ export default async (req, res) => {
             console.warn('No se obtuvieron eventos de ninguna fuente');
             return res.status(200).json([]);
         }
-        
-        // --- LÓGICA DE AGRUPACIÓN Y LIMPIEZA FINAL ---
         
         function quitarPrefijoTitulo(titulo) {
             if (!titulo) return '';
@@ -326,7 +294,6 @@ export default async (req, res) => {
             }
         }
         
-        // --- REGLAS DE IMAGEN PERSONALIZADA ---
         for (const grupo of agrupados) {
             const linkDomain = alanGuloConfig.linkDomain;
             if (Array.isArray(grupo.buttons) && grupo.buttons.some(btn => btn && btn.trim().toUpperCase() === 'LIGA1MAX')) {
