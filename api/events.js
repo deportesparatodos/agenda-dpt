@@ -357,10 +357,15 @@ async function fetchAlanGuloTVEvents() {
                 // Solo agregar eventos que tengan enlaces
                 if (links.length > 0) {
                     links.forEach(linkObj => {
+                        let finalLink = linkObj.url;
+                        // Reemplazo especial: si el link es https://alangulotv.space/ext/transmi-1/
+                        if (finalLink === 'https://alangulotv.space/ext/transmi-1/') {
+                            finalLink = 'https://p.alangulotv.space/?channel=transmi1';
+                        }
                         events.push({
                             time: time,
                             title: title,
-                            link: linkObj.url,
+                            link: finalLink,
                             button: linkObj.name, // SIEMPRE el texto real del canal
                             category: 'Deportes',
                             language: 'Español',
@@ -785,7 +790,7 @@ export default async (req, res) => {
             }
             // 2. Si el título contiene F1
             else if (grupo.title && grupo.title.toUpperCase().includes('F1')) {
-                grupo.image = 'https://p.alangulotv.live/f1';
+                grupo.image = 'https://p.alangulotv.space/f1';
             }
             // 3. Si el título contiene Copa Argentina
             else if (grupo.title && grupo.title.toLowerCase().includes('copa argentina')) {
