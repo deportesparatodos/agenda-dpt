@@ -1,0 +1,812 @@
+{
+    "espn": {
+          "repro1": "https://p.alangulotv.space/?channel=espn-a",
+          "repro2": "https://p.alangulotv.space/?channel=espn-b",
+          "repro3": "https://p.alangulotv.space/?channel=espn-c",
+          "repro4": "https://p.alangulotv.space/?channel=espn-d"
+      },
+      "tnt-sports": {
+          "repro1": "https://p.alangulotv.space/?channel=tnt-a",
+          "repro2": "https://p.alangulotv.space/?channel=tnt-b",
+          "repro3": "https://p.alangulotv.space/?channel=tnt-c",
+          "repro4": "https://p.alangulotv.space/?channel=tnt-d"
+      },
+      "tyc-sports": {
+          "repro1": "https://p.alangulotv.space/?channel=tyc-a",
+          "repro2": "https://p.alangulotv.space/?channel=tyc-b",
+          "repro3": "https://p.alangulotv.space/?channel=tyc-c",
+          "repro4": "https://p.alangulotv.space/?channel=tyc-d"
+      },
+      "tv-publica": {
+          "repro1": "https://p.alangulotv.space/?channel=tvp-a",
+          "repro2": "https://p.alangulotv.space/?channel=tvp-b",
+          "repro3": "https://p.alangulotv.space/?channel=tvp-c",
+          "repro4": "https://p.alangulotv.space/?channel=tvp-d"
+      },
+      "telefe": {
+          "repro1": "https://p.alangulotv.space/?channel=telefe-a",
+          "repro2": "https://p.alangulotv.space/?channel=telefe-b",
+          "repro3": "https://p.alangulotv.space/?channel=telefe-c",
+          "repro4": "https://p.alangulotv.space/?channel=telefe-d"
+      },
+      "fox-sports": {
+          "repro1": "https://p.alangulotv.space/?channel=fox-a",
+          "repro2": "https://p.alangulotv.space/?channel=fox-b",
+          "repro3": "https://p.alangulotv.space/?channel=fox-c",
+          "repro4": "https://p.alangulotv.space/?channel=fox-d"
+      },
+      "fox-sports-2": {
+          "repro1": "https://p.alangulotv.space/?channel=fox2-a",
+          "repro2": "https://p.alangulotv.space/?channel=fox2-b",
+          "repro3": "https://p.alangulotv.space/?channel=fox2-c",
+          "repro4": "https://p.alangulotv.space/?channel=fox2-d"
+      },
+      "fox-sports-3": {
+          "repro1": "https://p.alangulotv.space/?channel=fox3-a",
+          "repro2": "https://p.alangulotv.space/?channel=fox3-b",
+          "repro3": "https://p.alangulotv.space/?channel=fox3-c",
+          "repro4": "https://p.alangulotv.space/?channel=fox3-d"
+      },
+      "espn-2": {
+          "repro1": "https://p.alangulotv.space/?channel=espn2-a",
+          "repro2": "https://p.alangulotv.space/?channel=espn2-b",
+          "repro3": "https://p.alangulotv.space/?channel=espn2-c",
+          "repro4": "https://p.alangulotv.space/?channel=espn2-d"
+      },
+      "espn-3": {
+          "repro1": "https://p.alangulotv.space/?channel=espn3-a",
+          "repro2": "https://p.alangulotv.space/?channel=espn3-b",
+          "repro3": "https://p.alangulotv.space/?channel=espn3-c",
+          "repro4": "https://p.alangulotv.space/?channel=espn3-d"
+      },
+      "espn-4": {
+          "repro1": "https://p.alangulotv.space/?channel=espn4-a",
+          "repro2": "https://p.alangulotv.space/?channel=espn4-b",
+          "repro3": "https://p.alangulotv.space/?channel=espn4-c",
+          "repro4": "https://p.alangulotv.space/?channel=espn4-d"
+      },
+      "espn-5": {
+          "repro1": "https://p.alangulotv.space/?channel=espn5-a",
+          "repro2": "https://p.alangulotv.space/?channel=espn5-b",
+          "repro3": "https://p.alangulotv.space/?channel=espn5-c",
+          "repro4": "https://p.alangulotv.space/?channel=espn5-d"
+      },
+      "espn-6": {
+          "repro1": "https://p.alangulotv.space/?channel=espn6-a",
+          "repro2": "https://p.alangulotv.space/?channel=espn6-b",
+          "repro3": "https://p.alangulotv.space/?channel=espn6-c",
+          "repro4": "https://p.alangulotv.space/?channel=espn6-d"
+      },
+      "espn-7": {
+          "repro1": "https://p.alangulotv.space/?channel=espn7-a",
+          "repro2": "https://p.alangulotv.space/?channel=espn7-b",
+          "repro3": "https://p.alangulotv.space/?channel=espn7-c",
+          "repro4": "https://p.alangulotv.space/?channel=espn7-d"
+      },
+      "espn-premium": {
+          "repro1": "https://p.alangulotv.space/?channel=espn-premium-a",
+          "repro2": "https://p.alangulotv.space/?channel=espn-premium-b",
+          "repro3": "https://p.alangulotv.space/?channel=espn-premium-c",
+          "repro4": "https://p.alangulotv.space/?channel=espn-premium-d"
+      },
+      "directv": {
+          "repro1": "https://p.alangulotv.space/?channel=dtv-a",
+          "repro2": "https://p.alangulotv.space/?channel=dtv-b",
+          "repro3": "https://p.alangulotv.space/?channel=dtv-c",
+          "repro4": "https://p.alangulotv.space/?channel=dtv-d"
+      },
+      "directv-2": {
+          "repro1": "https://p.alangulotv.space/?channel=dtv2-a",
+          "repro2": "https://p.alangulotv.space/?channel=dtv2-b",
+          "repro3": "https://p.alangulotv.space/?channel=dtv2-c",
+          "repro4": "https://p.alangulotv.space/?channel=dtv2-d"
+      },
+      "directv-plus": {
+          "repro1": "https://p.alangulotv.space/?channel=dtvplus-a",
+          "repro2": "https://p.alangulotv.space/?channel=dtvplus-b",
+          "repro3": "https://p.alangulotv.space/?channel=dtvplus-c",
+          "repro4": "https://p.alangulotv.space/?channel=dtvplus-d"
+      },
+      "premiere": {
+          "repro1": "https://p.alangulotv.space/?channel=premiere-a",
+          "repro2": "https://p.alangulotv.space/?channel=premiere-b"
+      },
+      "premiere-2": {
+      "repro1": "https://p.alangulotv.space/?channel=premiere2-a",
+          "repro2": "https://p.alangulotv.space/?channel=premiere2-b"
+      },
+      "premiere-3": {
+      "repro1": "https://p.alangulotv.space/?channel=premiere3-a",
+          "repro2": "https://p.alangulotv.space/?channel=premiere3-b"
+      },
+      "premiere-4": {
+      "repro1": "https://p.alangulotv.space/?channel=premiere4-a",
+          "repro2": "https://p.alangulotv.space/?channel=premiere4-b"
+      },
+      "premiere-5": {
+      "repro1": "https://p.alangulotv.space/?channel=premiere5-a",
+          "repro2": "https://p.alangulotv.space/?channel=premiere5-b"
+      },
+      "premiere-6": {
+      "repro1": "https://p.alangulotv.space/?channel=premiere6-a",
+          "repro2": "https://p.alangulotv.space/?channel=premiere6-b"
+      },
+        "premiere-7": {
+          "repro1": "https://p.alangulotv.space/?channel=premiere7-a",
+          "repro2": "https://p.alangulotv.space/?channel=premiere7-b"
+      },
+        "premiere-8": {
+          "repro1": "https://p.alangulotv.space/?channel=premiere8-a",
+          "repro2": "https://p.alangulotv.space/?channel=premiere8-b"
+      },
+      "vtv": {
+          "repro1": "https://p.alangulotv.space/?channel=vtv-a",
+          "repro2": "https://p.alangulotv.space/?channel=vtv-b",
+          "repro3": "https://p.alangulotv.space/?channel=vtv-c",
+          "repro4": "https://p.alangulotv.space/?channel=vtv-d"
+      },
+      "vtv-plus": {
+          "repro1": "https://p.alangulotv.space/?channel=vtvplus-a",
+          "repro2": "https://p.alangulotv.space/?channel=vtvplus-b",
+          "repro3": "https://p.alangulotv.space/?channel=vtvplus-c",
+          "repro4": "https://p.alangulotv.space/?channel=vtvplus-d"
+      },
+      "win-sports": {
+          "repro1": "https://p.alangulotv.space/?channel=winsports-a",
+          "repro2": "https://p.alangulotv.space/?channel=winsports-b"
+      },
+      "win-sports-plus": {
+          "repro1": "https://p.alangulotv.space/?channel=winsportsplus-a",
+          "repro2": "https://p.alangulotv.space/?channel=winsportsplus-b"
+      },
+      "f1": {
+          "repro1": "https://p.alangulotv.space/?channel=f1-a",
+          "repro2": "https://p.alangulotv.space/?channel=f1-b"
+      },
+        "bein-sports": {
+      "repro1": "https://p.alangulotv.space/?channel=beinsports"
+      },
+        "daznf1": {
+      "repro1": "https://p.alangulotv.space/?channel=daznf1"
+      },
+        "disney-1": {
+      "repro1": "https://p.alangulotv.space/?channel=disney1-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney1-b"
+      },
+        "disney-2": {
+      "repro1": "https://p.alangulotv.space/?channel=disney2-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney2-b"
+      },
+        "disney-3": {
+      "repro1": "https://p.alangulotv.space/?channel=disney3-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney3-b"
+      },
+        "disney-4": {
+      "repro1": "https://p.alangulotv.space/?channel=disney4-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney4-b"
+      },
+        "disney-5": {
+      "repro1": "https://p.alangulotv.space/?channel=disney5-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney5-b"
+      },
+        "disney-6": {
+      "repro1": "https://p.alangulotv.space/?channel=disney6-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney6-b"
+      },
+        "disney-7": {
+      "repro1": "https://p.alangulotv.space/?channel=disney7-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney7-b"
+      },
+        "disney-8": {
+      "repro1": "https://p.alangulotv.space/?channel=disney8-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney8-b"
+      },
+        "disney-9": {
+      "repro1": "https://p.alangulotv.space/?channel=disney9-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney9-b"
+      },
+        "disney-10": {
+      "repro1": "https://p.alangulotv.space/?channel=disney10-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney10-b"
+      },
+        "disney-11": {
+      "repro1": "https://p.alangulotv.space/?channel=disney11-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney11-b"
+      },
+        "disney-12": {
+      "repro1": "https://p.alangulotv.space/?channel=disney12-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney12-b"
+      },
+        "disney-13": {
+      "repro1": "https://p.alangulotv.space/?channel=disney13-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney13-b"
+      },
+        "disney-14": {
+      "repro1": "https://p.alangulotv.space/?channel=disney14-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney14-b"
+      },
+        "disney-15": {
+      "repro1": "https://p.alangulotv.space/?channel=disney15-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney15-b"
+      },
+        "disney-16": {
+      "repro1": "https://p.alangulotv.space/?channel=disney16-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney16-b"
+      },
+      "disney-17": {
+      "repro1": "https://p.alangulotv.space/?channel=disney17-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney17-b"
+      },
+      "disney-18": {
+      "repro1": "https://p.alangulotv.space/?channel=disney18-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney18-b"
+      },
+      "disney-19": {
+      "repro1": "https://p.alangulotv.space/?channel=disney19-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney19-b"
+      },
+      "disney-20": {
+      "repro1": "https://p.alangulotv.space/?channel=disney20-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney20-b"
+      },
+      "disney-21": {
+      "repro1": "https://p.alangulotv.space/?channel=disney21-a",
+          "repro2": "https://p.alangulotv.space/?channel=disney21-b"
+      },
+      "tntuk": {
+      "repro1": "https://p.alangulotv.space/?channel=tntuk"
+      },
+      "tntuk-2": {
+      "repro1": "https://p.alangulotv.space/?channel=tntuk2"
+      },
+      "tntuk-3": {
+      "repro1": "https://p.alangulotv.space/?channel=tntuk3"
+      },
+      "tntuk-4": {
+      "repro1": "https://p.alangulotv.space/?channel=tntuk4"
+      },
+      "tnt": {
+      "repro1": "https://p.alangulotv.space/?channel=tnt"
+      },
+        "hypermotion": { 
+      "repro1": "https://p.alangulotv.space/?channel=hypermotion"
+      },
+        "hypermotion-2": {
+      "repro1": "https://p.alangulotv.space/?channel=hypermotion2"
+      },
+        "hypermotion-3": {
+      "repro1": "https://p.alangulotv.space/?channel=hypermotion3"
+      },
+        "fox-sports-premium-mx": {
+      "repro1": "https://p.alangulotv.space/?channel=foxsportspremium-a",
+      "repro2": "https://p.alangulotv.space/?channel=foxsportspremium-b",
+      "repro3": "https://p.alangulotv.space/?channel=foxsportspremium-c"
+      },
+        "fox-sports-mx": {
+      "repro1": "https://p.alangulotv.space/?channel=foxmx-a",
+      "repro2": "https://p.alangulotv.space/?channel=foxmx-b",
+      "repro3": "https://p.alangulotv.space/?channel=foxmx-c"
+      },
+        "fox-sports-mx-2": {
+      "repro1": "https://p.alangulotv.space/?channel=foxmx2-a",
+      "repro2": "https://p.alangulotv.space/?channel=foxmx2-b",
+      "repro3": "https://p.alangulotv.space/?channel=foxmx2-c"
+      },
+        "fox-sports-mx-3": {
+      "repro1": "https://p.alangulotv.space/?channel=foxmx3-a",
+      "repro2": "https://p.alangulotv.space/?channel=foxmx3-b",
+      "repro3": "https://p.alangulotv.space/?channel=foxmx3-c"
+      },
+        "bundesliga": {
+      "repro1": "https://p.alangulotv.space/?channel=bundesliga1"
+      },
+        "bundesliga-2": {
+      "repro1": "https://p.alangulotv.space/?channel=bundesliga2"
+      },
+        "bundesliga-3": {
+      "repro1": "https://p.alangulotv.space/?channel=bundesliga3"
+      },
+      "bundesliga-4": {
+      "repro1": "https://p.alangulotv.space/?channel=bundesliga4"
+      },
+        "bundesliga-5": {
+      "repro1": "https://p.alangulotv.space/?channel=bundesliga5"
+      },
+      "sporttv": {
+      "repro1": "https://p.alangulotv.space/?channel=sporttv1"
+      },
+        "sporttv-2": {
+      "repro1": "https://p.alangulotv.space/?channel=sporttv2"
+      },
+        "sporttv-3": {
+      "repro1": "https://p.alangulotv.space/?channel=sporttv3"
+      },
+        "sporttv-4": {
+      "repro1": "https://p.alangulotv.space/?channel=sporttv4"
+      },
+        "sporttv-5": {
+      "repro1": "https://p.alangulotv.space/?channel=sporttv5"
+      },
+      "sporttv-6": {
+      "repro1": "https://p.alangulotv.space/?channel=sporttv6"
+      },
+      "daznpt": {
+      "repro1": "https://p.alangulotv.space/?channel=daznpt1"
+      },
+        "daznpt-2": {
+      "repro1": "https://p.alangulotv.space/?channel=daznpt2"
+      },
+        "daznpt-3": {
+      "repro1": "https://p.alangulotv.space/?channel=daznpt3"
+      },
+        "daznpt-4": {
+      "repro1": "https://p.alangulotv.space/?channel=daznpt4"
+      },
+        "daznpt-5": {
+      "repro1": "https://p.alangulotv.space/?channel=daznpt5"
+      },
+      "daznpt-6": {
+      "repro1": "https://p.alangulotv.space/?channel=daznpt6"
+      },
+      "fanatiz": {
+      "repro1": "https://p.alangulotv.space/?channel=fanatiz1"
+      },
+      "fanatiz-2": {
+      "repro1": "https://p.alangulotv.space/?channel=fanatiz2"
+      },
+      "daznes": {
+      "repro1": "https://p.alangulotv.space/?channel=daznes1"
+      },
+      "daznes-2": {
+      "repro1": "https://p.alangulotv.space/?channel=daznes2"
+      },	
+      "daznes-3": {
+      "repro1": "https://p.alangulotv.space/?channel=daznes3"
+      },
+      "daznes-4": {
+      "repro1": "https://p.alangulotv.space/?channel=daznes4"
+      },
+      "dazn-la-liga": {
+      "repro1": "https://p.alangulotv.space/?channel=daznlaliga"
+      },
+      "paramount": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount1"
+      },
+      "paramount-2": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount2"
+      },	
+      "paramount-3": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount3"
+      },
+      "paramount-4": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount4"
+      },
+      "paramount-5": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount5"
+      },
+      "paramount-6": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount6"
+      },
+      "paramount-7": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount7"
+      },
+      "paramount-8": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount8"
+      },
+      "paramount-9": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount9"
+      },
+      "paramount-10": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount10"
+      },
+      "paramount-11": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount11"
+      },
+      "paramount-12": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount12"
+      },
+      "paramount-13": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount13"
+      },
+      "paramount-14": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount14"
+      },
+      "paramount-15": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount15"
+      },
+      "paramount-16": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount16"
+      },
+      "paramount-17": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount17"
+      },
+      "paramount-18": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount18"
+      },
+      "paramount-19": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount19"
+      },
+      "paramount-20": {
+      "repro1": "https://p.alangulotv.space/?channel=paramount20"
+      },
+      "universo": {
+      "repro1": "https://p.alangulotv.space/?channel=universo"
+      },
+      "flow": {
+      "repro1": "https://p.alangulotv.space/?channel=flow1"
+      },
+      "flow-2": {
+      "repro1": "https://p.alangulotv.space/?channel=flow2"
+      },
+      "flow-3": {
+      "repro1": "https://p.alangulotv.space/?channel=flow3"
+      },
+      "flow-4": {
+      "repro1": "https://p.alangulotv.space/?channel=flow4"
+      },
+      "flow-5": {
+      "repro1": "https://p.alangulotv.space/?channel=flow5"
+      },
+      "peacock": {
+      "repro1": "https://p.alangulotv.space/?channel=peacock1"
+      },
+      "peacock-2": {
+      "repro1": "https://p.alangulotv.space/?channel=peacock2"
+      },
+      "tudn": {
+      "repro1": "https://p.alangulotv.space/?channel=tudn"
+      },
+      "netflix": {
+      "repro1": "https://p.alangulotv.space/?channel=netflix1"
+      },
+      "netflix-2": {
+      "repro1": "https://p.alangulotv.space/?channel=netflix2"
+      },
+      "latinape": {
+      "repro1": "https://p.alangulotv.space/?channel=latinape"
+      },
+      "canal-11": {
+      "repro1": "https://p.alangulotv.space/?channel=canal11"
+      },
+      "fox-deportes": {
+      "repro1": "https://p.alangulotv.space/?channel=foxdeportes-a",
+      "repro2": "https://p.alangulotv.space/?channel=foxdeportes-b"
+      },
+        "espn-premium-cel": {
+      "repro1": "https://p.alangulotv.space/?channel=espn-premium-b"
+      },
+        "espn-premium-cel2": {
+      "repro1": "https://p.alangulotv.space/?channel=espn-premium-c"
+      },
+        "tnt-sports-cel": {
+      "repro1": "https://p.alangulotv.space/?channel=tnt-b"
+      },
+        "tnt-sports-cel2": {
+      "repro1": "https://p.alangulotv.space/?channel=tnt-c"
+      },
+        "fox-sports-cel": {
+      "repro1": "https://p.alangulotv.space/?channel=fox-b"
+      },
+        "fox-sports-cel2": {
+      "repro1": "https://p.alangulotv.space/?channel=fox-c"
+      },
+        "espnplus-1": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus1"
+      },
+        "espnplus-2": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus2"
+      },
+        "espnplus-3": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus3"
+      },
+        "espnplus-4": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus4"
+      },
+        "espnplus-5": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus5"
+      },
+        "espnplus-6": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus6"
+      },
+        "espnplus-7": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus7"
+      },
+        "espnplus-8": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus8"
+      },
+        "espnplus-9": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus9"
+      },
+        "espnplus-10": {
+      "repro1": "https://p.alangulotv.space/?channel=espnplus10"
+      },
+      "atv": { 
+        "repro1": "https://p.alangulotv.space/?channel=atv" 
+      },
+      "espndeportes": {
+         "repro1": "https://p.alangulotv.space/?channel=espndeportes-a",
+         "repro2": "https://p.alangulotv.space/?channel=espndeportes-b"
+         },  
+      "caracoltv": {
+         "repro1": "https://p.alangulotv.space/?channel=caracoltv"
+        },  
+      "america-tv-pe": {
+         "repro1": "https://p.alangulotv.space/?channel=americatvpe"
+        },
+      "chilevision": { 
+        "repro1": "https://p.alangulotv.space/?channel=chilevision" 
+      	},  
+      "espnmx": {
+         "repro1": "https://p.alangulotv.space/?channel=espnmx" 
+        },  
+      "espn-2-mx": {
+         "repro1": "https://p.alangulotv.space/?channel=espn2mx" 
+        },  
+      "espn-3-mx": {
+         "repro1": "https://p.alangulotv.space/?channel=espn3mx" 
+        }, 
+      "espn-co": {
+         "repro1": "https://p.alangulotv.space/?channel=espnco" 
+        },  
+      "espn-2-co": {
+         "repro1": "https://p.alangulotv.space/?channel=espn2co" 
+        },  
+      "espn-deportes": {
+         "repro1": "https://p.alangulotv.space/?channel=espndeportes-a",
+		 "repro2": "https://p.alangulotv.space/?channel=espndeportes-b"
+        },
+      "tyc-sports-play": {
+         "repro1": "https://p.alangulotv.space/?channel=tycplay" 
+        },  
+      "indycar": {
+         "repro1": "https://p.alangulotv.space/?channel=indycar" 
+        },
+      "indynxt": {
+         "repro1": "https://p.alangulotv.space/?channel=indynxt" 
+        },
+      "daznmgp": { 
+        "repro1": "https://p.alangulotv.space/?channel=daznmgp" 
+      },
+      "superformula": {
+         "repro1": "https://p.alangulotv.space/?channel=superformula"
+         },
+      "cup": { 
+        "repro1": "https://p.alangulotv.space/?channel=cup" 
+      },
+      "cup-2": { 
+        "repro1": "https://p.alangulotv.space/?channel=cup2" 
+      },
+      "fs1": {
+         "repro1": "https://p.alangulotv.space/?channel=fs1" 
+        },
+      "fs2": {
+         "repro1": "https://p.alangulotv.space/?channel=fs2"
+         },
+      "xfinity": {
+         "repro1": "https://p.alangulotv.space/?channel=xfinity" 
+        },  
+      "rally": {
+         "repro1": "https://p.alangulotv.space/?channel=rally" 
+        },  
+      "rally-2": { 
+        "repro1": "https://p.alangulotv.space/?channel=rally2"
+       }, 
+      "rally-tv": {
+         "repro1": "https://p.alangulotv.space/?channel=rallytv" 
+        },  
+      "especial": {
+         "repro1": "https://p.alangulotv.space/?channel=especial" 
+        },   
+      "especial-2": {
+         "repro1": "https://p.alangulotv.space/?channel=especial2" 
+        }, 
+      "stream": {
+         "repro1": "https://p.alangulotv.space/?channel=stream"
+         },  
+      "stream-2": {
+         "repro1": "https://p.alangulotv.space/?channel=stream2" 
+        },  
+      "tv": { 
+        "repro1": "https://p.alangulotv.space/?channel=tv" 
+      }, 
+      "tv-2": {
+         "repro1": "https://p.alangulotv.space/?channel=tv2"
+         }, 
+      "multicam": {
+          "repro1": "https://p.alangulotv.space/multicam.html" 
+         }, 
+      "multi-f1": {
+          "repro1": "https://p.alangulotv.space/multi-f1.html" 
+         }, 
+      "multi-2": {
+          "repro1": "https://play.alangulotv.live/multi-2.html" 
+        },
+      "l1max": {
+         "repro1": "https://p.alangulotv.space/?channel=l1max-a",
+		 "repro2": "https://p.alangulotv.space/?channel=l1max-b"
+		 },
+      "tigo-sports-py": {
+         "repro1": "https://p.alangulotv.space/?channel=tigosportspy-a",
+		 "repro2": "https://p.alangulotv.space/?channel=tigosportspy-b"
+      	}, 
+      "mls-1": {
+         "repro1": "https://p.alangulotv.space/?channel=mls1"
+        }, 
+      "mls-2": {
+         "repro1": "https://p.alangulotv.space/?channel=mls2"
+      	}, 
+      "mls-3": {
+         "repro1": "https://p.alangulotv.space/?channel=mls3"
+      	}, 
+      "mls-4": {
+         "repro1": "https://p.alangulotv.space/?channel=mls4"
+      	}, 
+      "mls-5": {
+         "repro1": "https://p.alangulotv.space/?channel=mls5"
+      	}, 
+      "mls-6": {
+         "repro1": "https://p.alangulotv.space/?channel=mls6"
+      	}, 
+      "mls-7": {
+         "repro1": "https://p.alangulotv.space/?channel=mls7"
+      	}, 
+      "mls-8": {
+         "repro1": "https://p.alangulotv.space/?channel=mls8"
+      	}, 
+      "mls-9": {
+         "repro1": "https://p.alangulotv.space/?channel=mls9"
+      	}, 
+      "mls-10": {
+         "repro1": "https://p.alangulotv.space/?channel=mls10"
+      	}, 
+      "mls-11": {
+         "repro1": "https://p.alangulotv.space/?channel=mls11"
+      	}, 
+      "mls-12": {
+         "repro1": "https://p.alangulotv.space/?channel=mls12"
+      	}, 
+      "mls-13": {
+         "repro1": "https://p.alangulotv.space/?channel=mls13"
+      	}, 
+      "golperu": {
+         "repro1": "https://p.alangulotv.space/?channel=golperu"
+        }, 
+      "max-1": {
+         "repro1": "https://p.alangulotv.space/?channel=max1"
+      	}, 
+      "max-2": {
+         "repro1": "https://p.alangulotv.space/?channel=max2"
+      	}, 
+      "max-3": {
+         "repro1": "https://p.alangulotv.space/?channel=max3"
+      	}, 
+      "max-4": {
+         "repro1": "https://p.alangulotv.space/?channel=max4"
+      	}, 
+      "max-5": {
+         "repro1": "https://p.alangulotv.space/?channel=max5"
+      	}, 
+      "eventos-1": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos1"
+      	}, 
+      "eventos-2": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos2"
+      	}, 
+      "eventos-3": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos3"
+      	}, 
+      "eventos-4": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos4"
+      	}, 
+      "eventos-5": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos5"
+      	}, 
+      "eventos-6": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos6"
+      	}, 
+      "eventos-7": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos7"
+      	}, 
+      "eventos-8": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos8"
+      	}, 
+      "eventos-9": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos9"
+      	}, 
+      "eventos-10": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos10"
+      	}, 
+      "eventos-11": {
+         "repro1": "https://p.alangulotv.space/?channel=eventos11"
+      	}, 
+      "eventos-ec": {
+         "repro1": "https://p.alangulotv.space/?channel=eventosec"
+      	}, 
+    "mlb-1": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb1-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb1-b"
+    },
+    "mlb-2": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb2-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb2-b"
+    },
+    "mlb-3": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb3-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb3-b"
+    },
+    "mlb-4": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb4-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb4-b"
+    },
+    "mlb-5": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb5-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb5-b"
+    },
+    "mlb-6": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb6-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb6-b"
+    },
+    "mlb-7": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb7-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb7-b"
+    },
+    "mlb-8": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb8-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb8-b"
+    },
+    "mlb-9": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb9-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb9-b"
+    },
+    "mlb-10": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb10-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb10-b"
+    },
+    "mlb-11": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb11-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb11-b"
+    },
+    "mlb-12": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb12-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb12-b"
+    },
+    "mlb-13": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb13-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb13-b"
+    },
+    "mlb-14": {
+        "repro1": "https://p.alangulotv.space/?channel=mlb14-a",
+          "repro2": "https://p.alangulotv.space/?channel=mlb14-b"
+    },
+    "usa-network": {
+        "repro1": "https://p.alangulotv.space/?channel=usanetwork-a",
+          "repro2": "https://p.alangulotv.space/?channel=usanetwork-b"
+    },
+    "wwe": {
+        "repro1": "https://p.alangulotv.space/?channel=wwe"
+    },
+    "espn-nl": {
+        "repro1": "https://p.alangulotv.space/?channel=espnnl"
+    },
+    "espn-2-nl": {
+        "repro1": "https://p.alangulotv.space/?channel=espn2nl"
+    },
+    "auftv": {
+        "repro1": "https://p.alangulotv.space/?channel=auftv"
+    },
+    "tyc": {
+        "repro1": "https://p.alangulotv.space/?channel=tyc-c"
+    },
+    "tyc-sports-2": {
+        "repro1": "https://p.alangulotv.space/?channel=tyc2"
+    },
+    "caze-1": {
+        "repro1": "https://p.alangulotv.space/?channel=caze1"
+    },
+    "caze-2": {
+        "repro1": "https://p.alangulotv.space/?channel=caze2"
+    },
+    "caze-3": {
+        "repro1": "https://p.alangulotv.space/?channel=caze3"
+    }
+}
