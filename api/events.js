@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 
 /**
  * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
- * Esto evita tener que cambiar manualmente los dominios cuando expiran.
+ * Esto evita tener que cambiar manually los dominios cuando expiran.
  */
 async function getDynamicAlanGuloConfig() {
     const mainUrl = 'https://alangulotv.live';
@@ -176,6 +176,10 @@ async function fetchAlanGuloTVEvents(config) {
                             image: imageUrl
                         };
                     }
+                    
+                    // FIX 3: Devolver null explícitamente si no se encontraron opciones válidas.
+                    // Esto evita que la promesa se resuelva como 'undefined'.
+                    return null;
 
                 } catch (error) {
                     console.error('Error procesando un evento de AlanGuloTV:', error);
@@ -186,8 +190,8 @@ async function fetchAlanGuloTVEvents(config) {
         });
 
         const resolvedEvents = await Promise.all(eventPromises);
-        // Filtrar cualquier evento que haya resultado en null (por errores o falta de links)
-        const validEvents = resolvedEvents.filter(event => event !== null);
+        // Filtrar cualquier evento que haya resultado en null (o undefined)
+        const validEvents = resolvedEvents.filter(Boolean);
 
         console.log(`AlanGuloTV: ${validEvents.length} eventos obtenidos con la nueva lógica.`);
         return validEvents;
@@ -272,20 +276,25 @@ export default async (req, res) => {
         }
         
         // --- LÓGICA DE AGRUPACIÓN Y LIMPIEZA FINAL ---
-        // (Esta parte sigue siendo útil para fusionar eventos duplicados de ambas fuentes)
         
         function quitarPrefijoTitulo(titulo) {
             if (!titulo) return '';
             const partes = titulo.split(': ');
             return partes.length > 1 ? partes.slice(1).join(': ').trim() : titulo.trim();
         }
+        
         function equiposCoinciden(ev1, ev2) {
+            // FIX 2: Añadir guarda para evitar errores con objetos inválidos o sin título.
+            if (!ev1 || !ev2 || typeof ev1.title !== 'string' || typeof ev2.title !== 'string') {
+                return false;
+            }
             const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\b(fc|vs|club|deportivo)\b/gi, '').replace(/[^a-z0-9]/g, '').trim();
             const eq1 = new Set(quitarPrefijoTitulo(ev1.title).split(' ').map(norm).filter(Boolean));
             const eq2 = new Set(quitarPrefijoTitulo(ev2.title).split(' ').map(norm).filter(Boolean));
             const inter = new Set([...eq1].filter(x => eq2.has(x)));
-            return inter.size >= 2; // Considerar una coincidencia si al menos 2 palabras clave (equipos) son iguales
+            return inter.size >= 2;
         }
+
         function minutosDiferencia(t1, t2) {
             const [h1, m1] = t1.split(':').map(Number);
             const [h2, m2] = t2.split(':').map(Number);
@@ -294,21 +303,28 @@ export default async (req, res) => {
 
         const agrupados = [];
         for (const ev of allEvents) {
+            // FIX 1: Añadir una guarda para saltar eventos inválidos o sin título.
+            // Esto previene el error 'Cannot read properties of undefined'.
+            if (!ev || typeof ev.title !== 'string') {
+                console.warn('Saltando evento inválido o sin título:', ev);
+                continue;
+            }
+
             let encontrado = false;
             for (const grupo of agrupados) {
                 if (equiposCoinciden(grupo, ev) && minutosDiferencia(grupo.time, ev.time) <= 15) {
-                    grupo.options.push(...ev.options);
-                    grupo.buttons.push(...ev.buttons);
+                    grupo.options.push(...(ev.options || []));
+                    grupo.buttons.push(...(ev.buttons || []));
                     if (ev.title.length > grupo.title.length) grupo.title = ev.title;
                     if (ev.time < grupo.time) grupo.time = ev.time;
-                    if (!grupo.image && ev.image) grupo.image = ev.image; // Heredar imagen si no hay una
-                    if (ev.source === 'alangulotv' && ev.image) grupo.image = ev.image; // Priorizar imagen de alangulotv
+                    if (!grupo.image && ev.image) grupo.image = ev.image;
+                    if (ev.source === 'alangulotv' && ev.image) grupo.image = ev.image;
                     encontrado = true;
                     break;
                 }
             }
             if (!encontrado) {
-                agrupados.push({ ...ev, options: [...ev.options], buttons: [...ev.buttons] });
+                agrupados.push({ ...ev });
             }
         }
         
