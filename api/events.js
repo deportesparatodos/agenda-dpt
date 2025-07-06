@@ -280,39 +280,38 @@ export default async (req, res) => {
         const adaptedEvents = Array.from(eventMap.values());
         // --- AGRUPACIÓN AVANZADA DE EVENTOS ---
         function normalizarTitulo(titulo) {
-            // Quita prefijos tipo "Primera División: " o similares
             return titulo.replace(/^([\w\sÁÉÍÓÚáéíóúüÜñÑ]+: )/i, '').trim().toLowerCase();
         }
         function diferenciaMinutos(hora1, hora2) {
-            // hora1 y hora2 en formato "HH:mm"
             const [h1, m1] = hora1.split(':').map(Number);
             const [h2, m2] = hora2.split(':').map(Number);
             return Math.abs((h1 * 60 + m1) - (h2 * 60 + m2));
         }
         const agrupados = [];
         for (const evento of allEvents) {
-            // Normaliza título para comparación
             const tituloNorm = normalizarTitulo(evento.title || '');
-            // Busca si ya existe un evento agrupado compatible
             let encontrado = null;
-            let idxEncontrado = -1;
             for (let i = 0; i < agrupados.length; i++) {
                 const ev = agrupados[i];
                 const evNorm = normalizarTitulo(ev.title);
-                // Si los títulos normalizados coinciden y la hora es igual o difiere hasta 30 min
                 if (evNorm === tituloNorm && diferenciaMinutos(ev.time, evento.time) <= 30) {
                     encontrado = ev;
-                    idxEncontrado = i;
                     break;
                 }
             }
+            // Prepara la opción con su botón asociado
+            let boton = '';
+            if (evento.source === 'streamtpglobal' && evento.link) {
+                const match = evento.link.match(/[?&]stream=([^&#]+)/i);
+                boton = match ? match[1].toUpperCase() : 'CANAL';
+            } else if (evento.button) {
+                boton = evento.button;
+            }
+            const opcion = evento.link ? { link: evento.link, button: boton } : null;
             if (encontrado) {
-                // Unir links y botones
-                if (evento.link && !encontrado.options.includes(evento.link)) {
-                    encontrado.options.push(evento.link);
-                }
-                if (evento.button && !encontrado.buttons.includes(evento.button)) {
-                    encontrado.buttons.push(evento.button);
+                // Unir opciones (link+botón)
+                if (opcion && !encontrado.options.some(o => o.link === opcion.link)) {
+                    encontrado.options.push(opcion);
                 }
                 // Preferir imagen de alangulotv
                 if (evento.source === 'alangulotv' && evento.image) {
@@ -331,12 +330,10 @@ export default async (req, res) => {
                     encontrado.source += ',' + evento.source;
                 }
             } else {
-                // Nuevo evento agrupado
                 agrupados.push({
                     time: evento.time || '00:00',
                     title: evento.title || 'Sin título',
-                    options: evento.link ? [evento.link] : [],
-                    buttons: evento.button ? [evento.button] : [],
+                    options: opcion ? [opcion] : [],
                     category: evento.category || 'Sin categoría',
                     language: evento.language || 'Desconocido',
                     date: evento.date || new Date().toISOString().split('T')[0],
@@ -345,6 +342,10 @@ export default async (req, res) => {
                 });
             }
         }
+        // Para compatibilidad, agrega un array de solo botones (sin duplicados)
+        agrupados.forEach(ev => {
+            ev.buttons = [...new Set(ev.options.map(o => o.button))];
+        });
         return res.status(200).json(agrupados);
     } catch (error) {
         console.error('Error en la función principal:', error);
