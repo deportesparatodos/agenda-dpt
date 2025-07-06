@@ -120,31 +120,29 @@ async function fetchAlanGuloTVEvents(config, canales) {
         $('.match-container').each((index, element) => {
             try {
                 const $container = $(element);
-                let imageUrl = $container.find('img.event-logo, img.team-logo').first().attr('src') || '';
+                // Prioriza la imagen del evento
+                let imageUrl = $container.find('img.event-logo').attr('src') || '';
+                if (!imageUrl) {
+                    imageUrl = $container.find('img.team-logo').first().attr('src') || '';
+                }
                 if (imageUrl && imageUrl.startsWith('/')) {
                     imageUrl = `https://${linkDomain}${imageUrl}`;
                 }
-
                 const time = $container.find('.time').text().trim() || '00:00';
-                
                 const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
                 const title = teamNames.length > 1 ? `${teamNames[0]} vs ${teamNames[1]}` : teamNames[0] || 'Evento sin título';
-
                 if (title.toUpperCase().includes('MLB')) {
                     imageUrl = `https://${linkDomain}/mlb`;
                 }
-
                 const $linksContainer = $container.next('.links-container');
                 if ($linksContainer.length > 0) {
                     $linksContainer.find('.link-button, a').each((i, linkEl) => {
                         const $link = $(linkEl);
                         const href = $link.attr('href');
                         const buttonName = $link.text().trim() || 'CANAL';
-                        
                         if (href) {
                             const pathParts = href.split('/').filter(part => part.length > 0);
                             const linkKey = pathParts[pathParts.length - 1];
-
                             if (linkKey && canales.canales && canales.canales[linkKey]) {
                                 const channelData = canales.canales[linkKey];
                                 const firstAvailableKey = Object.keys(channelData)[0];
