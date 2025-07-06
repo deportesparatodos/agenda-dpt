@@ -1,8 +1,8 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
+import axios from 'axios';
+import cheerio from 'cheerio';
 
 // Endpoint para obtener los eventos scrapeados de alangulotv
-module.exports = async (req, res) => {
+export default async (req, res) => {
   try {
     const { data: html } = await axios.get('https://alangulotv.space');
     const $ = cheerio.load(html);
