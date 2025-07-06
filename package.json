@@ -12,8 +12,8 @@
     "start": "vercel dev"
   },
   "dependencies": {
-    "node-fetch": "^3.3.2",
-    "cheerio": "^1.0.0-rc.12"
-  },
-  "devDependencies": {}
+    "axios": "^1.10.0",
+    "cheerio": "^1.1.0",
+    "node-fetch": "^3.3.2"
+  }
 }
