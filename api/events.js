@@ -1,6 +1,41 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
+/**
+ * NEW: Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
+ * Esto evita tener que cambiar manualmente los dominios cuando expiran.
+ */
+async function getDynamicAlanGuloConfig() {
+    const mainUrl = 'https://alangulotv.live';
+    try {
+        const response = await fetch(mainUrl, {
+            redirect: 'follow',
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
+        const finalUrl = new URL(response.url);
+        const baseDomain = finalUrl.hostname; // e.g., alangulotv.space
+        const linkDomain = `p.${baseDomain}`;   // e.g., p.alangulotv.space
+        const agendaUrl = `https://${baseDomain}/agenda-2/`;
+        const baseOrigin = `https://${baseDomain}`;
+
+        console.log(`Dominio de AlanGuloTV detectado: ${baseDomain}`);
+
+        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
+    } catch (error) {
+        console.error('No se pudo obtener el dominio dinámico de AlanGuloTV. Usando valores por defecto.', error);
+        // Fallback a los últimos dominios conocidos para no romper la API
+        const baseDomain = 'alangulotv.space';
+        const linkDomain = `p.${baseDomain}`;
+        const agendaUrl = `https://${baseDomain}/agenda-2/`;
+        const baseOrigin = `https://${baseDomain}`;
+        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
+    }
+}
+
+
 function adjustTimeZone(time, date) {
     if (!time || !date) return time || '00:00';
 
@@ -219,13 +254,15 @@ function getFirstChannelKey(name) {
 }
 
 /**
- * Función para hacer scraping de alangulotv.live usando Cheerio
+ * Función para hacer scraping de alangulotv usando Cheerio
+ * MODIFIED: Acepta un objeto de configuración con las URLs dinámicas.
  */
-async function fetchAlanGuloTVEvents() {
+async function fetchAlanGuloTVEvents(config) {
+    const { agendaUrl, linkDomain, baseOrigin } = config;
     try {
-        console.log('Fetching AlanGuloTV eventos...');
+        console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
         
-        const response = await fetch('https://alangulotv.live/agenda-2/', {
+        const response = await fetch(agendaUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -262,9 +299,9 @@ async function fetchAlanGuloTVEvents() {
                         imageUrl = $teamLogo.attr('src') || '';
                     }
                 }
-                // Si la URL es relativa, hacerla absoluta
+                // Si la URL es relativa, hacerla absoluta usando el dominio dinámico
                 if (imageUrl && imageUrl.startsWith('/')) {
-                    imageUrl = `https://alangulotv.live${imageUrl}`;
+                    imageUrl = `https://${linkDomain}${imageUrl}`;
                 }
                 // Extraer la hora
                 const timeText = $container.find('.time').text().trim();
@@ -285,9 +322,9 @@ async function fetchAlanGuloTVEvents() {
                 } else {
                     title = 'Evento sin título';
                 }
-                // FORZAR imagen MLB si el título contiene MLB
+                // FORZAR imagen MLB si el título contiene MLB (ahora con URL dinámica)
                 if (title.toUpperCase().includes('MLB')) {
-                    imageUrl = 'https://p.alangulotv.live/mlb';
+                    imageUrl = `https://${linkDomain}/mlb`;
                 }
                 // Buscar el contenedor de enlaces (siguiente elemento hermano)
                 const $linksContainer = $container.next('.links-container');
@@ -299,7 +336,7 @@ async function fetchAlanGuloTVEvents() {
                         let buttonName = $link.text().trim();
                         if (!buttonName) buttonName = 'CANAL';
                         let finalLink;
-                        // Si el href es /canal/xxx/ o https://alangulotv.live/canal/xxx/ extraer xxx y usarlo como key
+                        // Si el href es /canal/xxx/ o https://.../canal/xxx/ extraer xxx y usarlo como key
                         let canalKey = null;
                         const canalMatch = href && href.match(/\/canal\/([a-zA-Z0-9\-]+)\//);
                         if (canalMatch) {
@@ -322,31 +359,37 @@ async function fetchAlanGuloTVEvents() {
                         if (/^disney\d+$/i.test(channelKey)) {
                             channelKey = channelKey + '-a';
                         }
-                        finalLink = `https://play.alangulotv.live/?channel=${channelKey}`;
-                        // REEMPLAZOS ESPECIALES
-                        if (finalLink === 'https://play.alangulotv.live/?channel=disneyextensinpc') {
-                            finalLink = 'https://play.alangulotv.live/?channel=transmi1';
-                        } else if (finalLink === 'https://play.alangulotv.live/?channel=foxsportsmx') {
-                            finalLink = 'https://play.alangulotv.live/?channel=foxmx-a';
-                        } else if (finalLink === 'https://play.alangulotv.live/?channel=directv') {
-                            finalLink = 'https://play.alangulotv.live/?channel=dtv-a';
+                        
+                        finalLink = `https://${linkDomain}/?channel=${channelKey}`;
+                        
+                        // REEMPLAZOS ESPECIALES (ahora dinámicos)
+                        if (channelKey === 'disneyextensinpc') {
+                            finalLink = `https://${linkDomain}/?channel=transmi1`;
+                        } else if (channelKey === 'foxsportsmx') {
+                            finalLink = `https://${linkDomain}/?channel=foxmx-a`;
+                        } else if (channelKey === 'directv') {
+                            finalLink = `https://${linkDomain}/?channel=dtv-a`;
+                        } else if (channelKey === 'foxdeportes') { // Reemplazo especial de tu pedido
+                            finalLink = `https://${linkDomain}/?channel=foxdeportes-a`;
                         }
-                        // REEMPLAZO FINAL SEGÚN TU PEDIDO
-                        if (finalLink === 'https://play.alangulotv.live/?channel=telemetraoficialdealangulotv') {
+
+                        // REEMPLAZO FINAL SEGÚN TU PEDIDO (ahora dinámico)
+                        if (channelKey === 'telemetraoficialdealangulotv') {
                             finalLink = 'https://alangulo-dashboard-f1.vercel.app/';
                             buttonName = 'TELEMETRIA OFICIAL';
-                        } else if (finalLink === 'https://play.alangulotv.live/?channel=multif1') {
-                            finalLink = 'https://alangulotv.live/canal/multi-f1/';
+                        } else if (channelKey === 'multif1') {
+                            finalLink = `${baseOrigin}/canal/multi-f1/`;
                             buttonName = 'MULTICAM (ALANGULOTV)';
                         }
 
                         // Si el link final es uno de los dos especiales, forzar el nombre del botón aunque sea 'OPCION'
-                        if (finalLink === 'https://alangulotv.live/canal/multi-f1/') {
+                        if (finalLink === `${baseOrigin}/canal/multi-f1/`) {
                             buttonName = 'MULTICAM (ALANGULOTV)';
                         }
                         if (finalLink === 'https://alangulo-dashboard-f1.vercel.app/') {
                             buttonName = 'TELEMETRIA OFICIAL';
                         }
+                        
                         links.push({
                             name: buttonName,
                             url: finalLink
@@ -384,7 +427,7 @@ async function fetchAlanGuloTVEvents() {
         // Fallback: intentar con regex si Cheerio falla
         try {
             console.log('Intentando método fallback con regex...');
-            return await fetchAlanGuloTVFallback();
+            return await fetchAlanGuloTVFallback(config); // Pasar config al fallback
         } catch (fallbackError) {
             console.error('Método fallback también falló:', fallbackError);
             return [];
@@ -394,9 +437,12 @@ async function fetchAlanGuloTVEvents() {
 
 /**
  * Método fallback usando regex para parsear AlanGuloTV
+ * MODIFIED: Acepta config para usar URLs dinámicas.
  */
-async function fetchAlanGuloTVFallback() {
-    const response = await fetch('https://alangulotv.live/agenda-2/', {
+async function fetchAlanGuloTVFallback(config) {
+    const { agendaUrl, baseOrigin } = config;
+
+    const response = await fetch(agendaUrl, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         },
@@ -445,7 +491,7 @@ async function fetchAlanGuloTVFallback() {
                 
                 if (href && linkText) {
                     const fullUrl = href.startsWith('/') 
-                        ? `https://alangulotv.live${href}` 
+                        ? `${baseOrigin}${href}` 
                         : href;
                     const urlWithStream = `${fullUrl}?stream=${encodeURIComponent(linkText)}`;
                     
@@ -485,6 +531,9 @@ export default async (req, res) => {
 
     try {
         console.log('Iniciando obtención de eventos...');
+
+        // MODIFIED: Obtener configuración dinámica para AlanGuloTV
+        const alanGuloConfig = await getDynamicAlanGuloConfig();
         
         // Obtener eventos de ambas fuentes en paralelo with timeout
         const [streamTpEvents, alanGuloEvents] = await Promise.allSettled([
@@ -493,7 +542,7 @@ export default async (req, res) => {
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout StreamTpGlobal')), 15000))
             ]),
             Promise.race([
-                fetchAlanGuloTVEvents(),
+                fetchAlanGuloTVEvents(alanGuloConfig), // MODIFIED: Pasar config
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout AlanGuloTV')), 20000))
             ])
         ]);
@@ -521,9 +570,9 @@ export default async (req, res) => {
         // Procesar eventos: ajustar horarios y agrupar por título y hora
         const eventMap = new Map();
         allEvents.forEach(event => {
-            // Forzar imagen MLB si el título contiene MLB (para cualquier fuente)
+            // MODIFIED: Forzar imagen MLB con URL dinámica
             if (event.title && event.title.toUpperCase().includes('MLB')) {
-                event.image = 'https://p.alangulotv.live/mlb';
+                event.image = `https://${alanGuloConfig.linkDomain}/mlb`;
             }
             // Solo procesar eventos que tengan tiempo válido
             if (event.time) {
@@ -595,7 +644,7 @@ export default async (req, res) => {
             }
             // Corregir textos especiales y nunca dejar 'OPCION' para los links especiales
             event.options.forEach((opt, idx) => {
-                if (opt === 'https://alangulotv.live/canal/multi-f1/') {
+                if (opt === `${alanGuloConfig.baseOrigin}/canal/multi-f1/`) {
                     event.buttons[idx] = 'MULTICAM (ALANGULOTV)';
                 }
                 if (opt === 'https://alangulo-dashboard-f1.vercel.app/') {
@@ -630,14 +679,18 @@ export default async (req, res) => {
             event.options.forEach((opt, idx) => {
                 if (!event.buttons[idx] || event.buttons[idx].toUpperCase() === 'CANAL' || event.buttons[idx].toUpperCase() === 'OPCION') {
                     if (typeof opt === 'string') {
-                        const urlObj = new URL(opt, 'https://dummy.base');
-                        const channel = urlObj.searchParams.get('channel');
-                        if (channel) {
-                            event.buttons[idx] = channel;
-                        } else {
-                            // Si no hay channel, usar el último segmento del path
-                            const last = urlObj.pathname.split('/').filter(Boolean).pop();
-                            event.buttons[idx] = last || 'ENLACE';
+                        try {
+                             const urlObj = new URL(opt, 'https://dummy.base');
+                             const channel = urlObj.searchParams.get('channel');
+                             if (channel) {
+                                 event.buttons[idx] = channel;
+                             } else {
+                                 // Si no hay channel, usar el último segmento del path
+                                 const last = urlObj.pathname.split('/').filter(Boolean).pop();
+                                 event.buttons[idx] = last || 'ENLACE';
+                             }
+                        } catch {
+                             event.buttons[idx] = 'ENLACE';
                         }
                     } else {
                         event.buttons[idx] = 'ENLACE';
@@ -655,36 +708,7 @@ export default async (req, res) => {
         // Eliminar eventos sin botones/canales válidos
         adaptedEvents = adaptedEvents.filter(ev => Array.isArray(ev.options) && ev.options.length > 0 && Array.isArray(ev.buttons) && ev.buttons.length > 0);
 
-        // Cambiar todos los enlaces play.alangulotv.live por p.alangulotv.space en la API antes de devolver
-        adaptedEvents.forEach(ev => {
-            if (ev.options && Array.isArray(ev.options)) {
-                ev.options = ev.options.map(link => {
-                    if (typeof link === 'string' && link.startsWith('https://play.alangulotv.live')) {
-                        link = link.replace('https://play.alangulotv.live', 'https://p.alangulotv.space');
-                    }
-                    if (typeof link === 'string' && link.startsWith('https://p.alangulotv.live')) {
-                        link = link.replace('https://p.alangulotv.live', 'https://p.alangulotv.space');
-                    }
-                    // Reemplazo especial para foxdeportes
-                    if (link === 'https://p.alangulotv.space/?channel=foxdeportes') {
-                        return 'https://p.alangulotv.space/?channel=foxdeportes-a';
-                    }
-                    return link;
-                });
-            }
-            // Cambiar imágenes de alangulotv.live y p.alangulotv.live a p.alangulotv.space
-            if (ev.image && typeof ev.image === 'string') {
-                if (ev.image.startsWith('https://p.alangulotv.live')) {
-                    ev.image = ev.image.replace('https://p.alangulotv.live', 'https://p.alangulotv.space');
-                }
-                if (ev.image.startsWith('https://play.alangulotv.live')) {
-                    ev.image = ev.image.replace('https://play.alangulotv.live', 'https://p.alangulotv.space');
-                }
-                if (ev.image.startsWith('https://alangulotv.live')) {
-                    ev.image = ev.image.replace('https://alangulotv.live', 'https://p.alangulotv.space');
-                }
-            }
-        });
+        // REMOVED: El bloque de reemplazo manual de dominios ya no es necesario.
 
         // --- AGRUPACIÓN AVANZADA DE EVENTOS (idéntica al frontend, ahora con tolerancia de 15min) ---
         function quitarPrefijoTitulo(titulo) {
@@ -779,17 +803,19 @@ export default async (req, res) => {
 
         // --- REGLAS DE IMAGEN PERSONALIZADA SEGÚN TU PEDIDO ---
         for (const grupo of agrupados) {
+             // MODIFIED: URLs de imágenes personalizadas ahora usan el dominio dinámico
+            const linkDomain = alanGuloConfig.linkDomain;
             // 1. Si algún botón es LIGA1MAX
             if (Array.isArray(grupo.buttons) && grupo.buttons.some(btn => btn && btn.trim().toUpperCase() === 'LIGA1MAX')) {
                 grupo.image = 'https://a.espncdn.com/combiner/i?img=%2Fi%2Fleaguelogos%2Fsoccer%2F500%2F1813.png';
             }
             // 2. Si el título contiene F1
             else if (grupo.title && grupo.title.toUpperCase().includes('F1')) {
-                grupo.image = 'https://p.alangulotv.space/f1';
+                grupo.image = `https://${linkDomain}/f1`;
             }
             // 3. Si el título contiene Copa Argentina
             else if (grupo.title && grupo.title.toLowerCase().includes('copa argentina')) {
-                grupo.image = 'https://p.alangulotv.live/copaargentina';
+                grupo.image = `https://${linkDomain}/copaargentina`;
             }
             // 4. Si el título contiene Primera B Metropolitana
             else if (grupo.title && grupo.title.toLowerCase().includes('primera b metropolitana')) {
@@ -797,7 +823,7 @@ export default async (req, res) => {
             }
             // 5. Si el título contiene Mundial de Clubes
             else if (grupo.title && grupo.title.toLowerCase().includes('mundial de clubes')) {
-                grupo.image = 'https://p.alangulotv.live/copamundialdeclubes';
+                grupo.image = `https://${linkDomain}/copamundialdeclubes`;
             }
             // 6. Si el título contiene UFC
             else if (grupo.title && grupo.title.toUpperCase().includes('UFC')) {
@@ -805,7 +831,7 @@ export default async (req, res) => {
             }
             // 7. Si el título contiene Boxeo
             else if (grupo.title && grupo.title.toLowerCase().includes('boxeo')) {
-                grupo.image = 'https://p.alangulotv.live/boxeo';
+                grupo.image = `https://${linkDomain}/boxeo`;
             }
             // 8. Si no tiene imagen, poner imagen por defecto
             if (!grupo.image) {
