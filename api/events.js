@@ -787,8 +787,8 @@ export default async (req, res) => {
             // Reemplazar en links de canales
             if (Array.isArray(grupo.options)) {
                 grupo.options = grupo.options.map(link => {
-                    if (typeof link === 'string' && link.startsWith('https://p.alangulotv.live')) {
-                        link = link.replace('https://p.alangulotv.live', 'https://p.alangulotv.space');
+                    if (typeof link === 'string' && link.includes('p.alangulotv.live')) {
+                        link = link.replace(/p\.alangulotv\.live/g, 'p.alangulotv.space');
                     }
                     // Reemplazo especial para foxdeportes
                     if (link === 'https://p.alangulotv.space/?channel=foxdeportes') {
@@ -798,8 +798,8 @@ export default async (req, res) => {
                 });
             }
             // Reemplazar en imagen si corresponde
-            if (typeof grupo.image === 'string' && grupo.image.startsWith('https://p.alangulotv.live')) {
-                grupo.image = grupo.image.replace('https://p.alangulotv.live', 'https://p.alangulotv.space');
+            if (typeof grupo.image === 'string' && grupo.image.includes('p.alangulotv.live')) {
+                grupo.image = grupo.image.replace(/p\.alangulotv\.live/g, 'p.alangulotv.space');
             }
         }
 
