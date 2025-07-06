@@ -278,9 +278,52 @@ export default async (req, res) => {
         });
 
         const adaptedEvents = Array.from(eventMap.values());
-        // ... (resto del código de agrupación sin cambios)
-
-        return res.status(200).json(adaptedEvents);
+        // --- Agrupación inteligente de eventos de distintas fuentes ---
+        // Normaliza títulos quitando prefijos comunes
+        function normalizeTitle(title) {
+            return title.replace(/^(Fútbol:|Final:|Semifinal:|Cuartos:|Octavos:|Partido:|\s+)/i, '').trim().toLowerCase();
+        }
+        // Mapa para agrupar por título normalizado + hora
+        const mergedMap = new Map();
+        adaptedEvents.forEach(event => {
+            const normTitle = normalizeTitle(event.title);
+            const key = `${normTitle}__${event.time}`;
+            if (!mergedMap.has(key)) {
+                mergedMap.set(key, [event]);
+            } else {
+                mergedMap.get(key).push(event);
+            }
+        });
+        const mergedEvents = [];
+        for (const group of mergedMap.values()) {
+            if (group.length === 1) {
+                mergedEvents.push(group[0]);
+            } else {
+                // Unir eventos: nombre más largo, botones y opciones combinados, imagen de alangulotv si existe
+                let alangulotvEvent = group.find(e => e.source === 'alangulotv');
+                let streamtpEvent = group.find(e => e.source === 'streamtpglobal');
+                let title = group.reduce((a, b) => a.title.length >= b.title.length ? a : b).title;
+                let image = alangulotvEvent ? alangulotvEvent.image : group[0].image;
+                let options = [...new Set(group.flatMap(e => e.options))];
+                let buttons = group.flatMap(e => e.buttons);
+                let category = alangulotvEvent ? alangulotvEvent.category : group[0].category;
+                let language = alangulotvEvent ? alangulotvEvent.language : group[0].language;
+                let date = alangulotvEvent ? alangulotvEvent.date : group[0].date;
+                let time = group[0].time;
+                mergedEvents.push({
+                    time,
+                    title,
+                    options,
+                    buttons,
+                    category,
+                    language,
+                    date,
+                    source: 'multi',
+                    image
+                });
+            }
+        }
+        return res.status(200).json(mergedEvents);
     } catch (error) {
         console.error('Error en la función principal:', error);
         return res.status(500).json({ error: 'Error interno del servidor' });
