@@ -347,6 +347,10 @@ async function fetchAlanGuloTVEvents() {
                         if (finalLink === 'https://alangulo-dashboard-f1.vercel.app/') {
                             buttonName = 'TELEMETRIA OFICIAL';
                         }
+                        // NUEVO: reemplazo especial para disneysiestsenpcwindowsusaestaextensinsoloarg
+                        if (finalLink === 'https://p.alangulotv.space/?channel=disneysiestsenpcwindowsusaestaextensinsoloarg') {
+                            finalLink = 'https://p.alangulotv.space/?channel=transmi1';
+                        }
                         links.push({
                             name: buttonName,
                             url: finalLink
@@ -357,15 +361,10 @@ async function fetchAlanGuloTVEvents() {
                 // Solo agregar eventos que tengan enlaces
                 if (links.length > 0) {
                     links.forEach(linkObj => {
-                        let finalLink = linkObj.url;
-                        // Reemplazo especial: si el link es https://alangulotv.space/ext/transmi-1/
-                        if (finalLink === 'https://alangulotv.space/ext/transmi-1/') {
-                            finalLink = 'https://p.alangulotv.space/?channel=transmi1';
-                        }
                         events.push({
                             time: time,
                             title: title,
-                            link: finalLink,
+                            link: linkObj.url,
                             button: linkObj.name, // SIEMPRE el texto real del canal
                             category: 'Deportes',
                             language: 'Español',
