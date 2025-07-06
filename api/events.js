@@ -655,20 +655,23 @@ export default async (req, res) => {
         // Eliminar eventos sin botones/canales válidos
         adaptedEvents = adaptedEvents.filter(ev => Array.isArray(ev.options) && ev.options.length > 0 && Array.isArray(ev.buttons) && ev.buttons.length > 0);
 
-        // Cambiar todos los enlaces play.alangulotv.live por p.alangulotv.live en la API antes de devolver
-        adaptedEvents.forEach(ev => {
-            if (ev.options && Array.isArray(ev.options)) {
-                ev.options = ev.options.map(link => {
-                    if (typeof link === 'string' && link.startsWith('https://play.alangulotv.live')) {
-                        link = link.replace('https://play.alangulotv.live', 'https://p.alangulotv.live');
-                    }
-                    // Reemplazo especial para foxdeportes
-                    if (link === 'https://p.alangulotv.live/?channel=foxdeportes') {
-                        return 'https://p.alangulotv.live/?channel=foxdeportes-a';
-                    }
-                    return link;
-                });
+        // Cambiar todos los enlaces e imágenes de p.alangulotv.live por p.alangulotv.space
+        agrupados.forEach(grupo => {
+            // Cambiar en las opciones (links de canales)
+            if (Array.isArray(grupo.options)) {
+                grupo.options = grupo.options.map(opt =>
+                    typeof opt === 'string' ? opt.replace(/https:\/\/p\.alangulotv\.live\//g, 'https://p.alangulotv.space/') : opt
+                );
             }
+            // Cambiar en la imagen si corresponde
+            if (typeof grupo.image === 'string' && grupo.image.startsWith('https://p.alangulotv.live/')) {
+                grupo.image = grupo.image.replace('https://p.alangulotv.live/', 'https://p.alangulotv.space/');
+            }
+            // Reemplazo especial para foxdeportes
+            if (link === 'https://p.alangulotv.space/?channel=foxdeportes') {
+                return 'https://p.alangulotv.space/?channel=foxdeportes-a';
+            }
+            return link;
         });
 
         // --- AGRUPACIÓN AVANZADA DE EVENTOS (idéntica al frontend, ahora con tolerancia de 15min) ---
