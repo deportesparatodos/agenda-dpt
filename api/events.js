@@ -27,16 +27,24 @@ async function updateChannelsJson() {
 
         if (match && match[1]) {
             let channelsObjectString = match[1];
-            
+
+            // Evaluar el objeto JS de forma segura
+            let parsedObject;
+            try {
+                // eslint-disable-next-line no-eval
+                parsedObject = eval('(' + channelsObjectString + ')');
+            } catch (e) {
+                console.error('[SCRAPER] Error al evaluar el objeto channels:', e);
+                return;
+            }
+
             // Aseguramos que el directorio 'api' exista antes de escribir.
             const outputDir = path.dirname(outputPath);
             if (!fs.existsSync(outputDir)) {
                 fs.mkdirSync(outputDir, { recursive: true });
             }
 
-            // Convertimos el objeto a un string JSON formateado y lo guardamos.
-            const parsedObject = JSON.parse(channelsObjectString);
-            const prettyJsonString = JSON.stringify({ canales: parsedObject }, null, 4); // Envolvemos en un objeto raíz 'canales'
+            const prettyJsonString = JSON.stringify({ canales: parsedObject }, null, 4);
             fs.writeFileSync(outputPath, prettyJsonString, 'utf8');
 
             console.log(`[SCRAPER] ¡Éxito! Canales guardados en: ${outputPath}`);
@@ -44,8 +52,6 @@ async function updateChannelsJson() {
             console.error("[SCRAPER] No se pudo encontrar el objeto 'const channels' en el HTML.");
         }
     } catch (error) {
-        // Si el scraping falla, lo notificamos pero permitimos que el script continúe
-        // con la versión anterior de 'canales.json' si existe.
         console.error("[SCRAPER] Falló la actualización de canales. Se usará la versión local si existe.", error.message);
     }
 }
