@@ -468,40 +468,6 @@ async function fetchAlanGuloTVFallback() {
     return events;
 }
 
-/**
- * Obtiene la URL base real de alangulotv siguiendo la redirección de la página principal.
- * Devuelve la URL base (por ejemplo, https://p.alangulotv.space) o null si falla.
- */
-async function getCurrentAlangulotvBaseUrl() {
-    try {
-        // Usar fetch con redirect: 'follow' para obtener la URL final
-        const response = await fetch('https://alangulotv.live', {
-            method: 'GET',
-            redirect: 'follow',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            timeout: 10000
-        });
-        // La URL final después de redirecciones
-        const finalUrl = response.url;
-        // Buscar si es p.alangulotv.* o play.alangulotv.*
-        const match = finalUrl.match(/https?:\/\/(p|play)\.(alangulotv\.[a-z]+)/i);
-        if (match) {
-            return `https://${match[1]}.alangulotv.${match[2].split('.')[2]}`;
-        }
-        // Si la redirección es a https://alangulotv.space, devolver esa base
-        const match2 = finalUrl.match(/https?:\/\/(alangulotv\.[a-z]+)/i);
-        if (match2) {
-            return `https://${match2[1]}`;
-        }
-        return null;
-    } catch (error) {
-        console.error('Error detectando base actual de alangulotv:', error);
-        return null;
-    }
-}
-
 export default async (req, res) => {
     // Configurar CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -519,17 +485,7 @@ export default async (req, res) => {
 
     try {
         console.log('Iniciando obtención de eventos...');
-        // Detectar la base actual de alangulotv (redirige automáticamente si cambió)
-        const alanguloBase = await getCurrentAlangulotvBaseUrl();
-        // Definir posibles bases antiguas para reemplazo
-        const oldBases = [
-            'https://p.alangulotv.live',
-            'https://play.alangulotv.live',
-            'https://alangulotv.live',
-            'https://p.alangulotv.space',
-            'https://play.alangulotv.space',
-            'https://alangulotv.space'
-        ];
+        
         // Obtener eventos de ambas fuentes en paralelo with timeout
         const [streamTpEvents, alanGuloEvents] = await Promise.allSettled([
             Promise.race([
@@ -699,41 +655,33 @@ export default async (req, res) => {
         // Eliminar eventos sin botones/canales válidos
         adaptedEvents = adaptedEvents.filter(ev => Array.isArray(ev.options) && ev.options.length > 0 && Array.isArray(ev.buttons) && ev.buttons.length > 0);
 
-        // Cambiar todos los enlaces play/p.alangulotv.* y alangulotv.* por la base detectada
+        // Cambiar todos los enlaces play.alangulotv.live por p.alangulotv.space en la API antes de devolver
         adaptedEvents.forEach(ev => {
-            if (alanguloBase) {
-                if (ev.options && Array.isArray(ev.options)) {
-                    ev.options = ev.options.map(link => {
-                        if (typeof link === 'string') {
-                            let newLink = link;
-                            for (const oldBase of oldBases) {
-                                if (newLink.startsWith(oldBase)) {
-                                    // Si el link es canal, mantener el path y query
-                                    const urlObj = new URL(newLink, 'https://dummy.base');
-                                    newLink = alanguloBase + urlObj.pathname + (urlObj.search || '');
-                                    break;
-                                }
-                            }
-                            // Reemplazo especial para foxdeportes
-                            if (newLink === alanguloBase + '/?channel=foxdeportes') {
-                                return alanguloBase + '/?channel=foxdeportes-a';
-                            }
-                            return newLink;
-                        }
-                        return link;
-                    });
-                }
-                // Cambiar imágenes de alangulotv.* a la base detectada
-                if (ev.image && typeof ev.image === 'string') {
-                    let newImg = ev.image;
-                    for (const oldBase of oldBases) {
-                        if (newImg.startsWith(oldBase)) {
-                            const urlObj = new URL(newImg, 'https://dummy.base');
-                            newImg = alanguloBase + urlObj.pathname;
-                            break;
-                        }
+            if (ev.options && Array.isArray(ev.options)) {
+                ev.options = ev.options.map(link => {
+                    if (typeof link === 'string' && link.startsWith('https://play.alangulotv.live')) {
+                        link = link.replace('https://play.alangulotv.live', 'https://p.alangulotv.space');
                     }
-                    ev.image = newImg;
+                    if (typeof link === 'string' && link.startsWith('https://p.alangulotv.live')) {
+                        link = link.replace('https://p.alangulotv.live', 'https://p.alangulotv.space');
+                    }
+                    // Reemplazo especial para foxdeportes
+                    if (link === 'https://p.alangulotv.space/?channel=foxdeportes') {
+                        return 'https://p.alangulotv.space/?channel=foxdeportes-a';
+                    }
+                    return link;
+                });
+            }
+            // Cambiar imágenes de alangulotv.live y p.alangulotv.live a p.alangulotv.space
+            if (ev.image && typeof ev.image === 'string') {
+                if (ev.image.startsWith('https://p.alangulotv.live')) {
+                    ev.image = ev.image.replace('https://p.alangulotv.live', 'https://p.alangulotv.space');
+                }
+                if (ev.image.startsWith('https://play.alangulotv.live')) {
+                    ev.image = ev.image.replace('https://play.alangulotv.live', 'https://p.alangulotv.space');
+                }
+                if (ev.image.startsWith('https://alangulotv.live')) {
+                    ev.image = ev.image.replace('https://alangulotv.live', 'https://p.alangulotv.space');
                 }
             }
         });
