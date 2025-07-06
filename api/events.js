@@ -671,7 +671,6 @@ export default async (req, res) => {
             if (link === 'https://p.alangulotv.space/?channel=foxdeportes') {
                 return 'https://p.alangulotv.space/?channel=foxdeportes-a';
             }
-            return link;
         });
 
         // --- AGRUPACIÓN AVANZADA DE EVENTOS (idéntica al frontend, ahora con tolerancia de 15min) ---
