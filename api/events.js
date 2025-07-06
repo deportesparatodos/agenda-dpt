@@ -328,7 +328,35 @@ async function fetchAlanGuloTVFallback(config) {
     return events;
 }
 
+// --- FUNCIÓN PARA ACTUALIZAR canales.json DESDE LA WEB ---
+async function updateCanalesJson() {
+    const url = 'https://alangulotv.space/canal/';
+    try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 15000 });
+        const html = await res.text();
+        // Buscar el bloque const channels = {...};
+        const match = html.match(/const channels\s*=\s*(\{[\s\S]*?\});/);
+        if (!match) throw new Error('No se encontró el bloque channels');
+        let channelsObj = {};
+        try {
+            // Evaluar el objeto JS de forma segura
+            channelsObj = eval('(' + match[1] + ')');
+        } catch (e) {
+            throw new Error('No se pudo parsear channels: ' + e.message);
+        }
+        // Guardar en canales.json
+        const canalesPath = path.join(process.cwd(), 'api', 'canales.json');
+        fs.writeFileSync(canalesPath, JSON.stringify({ canales: channelsObj }, null, 2), 'utf8');
+        console.log('canales.json actualizado correctamente');
+    } catch (err) {
+        console.error('Error actualizando canales.json:', err);
+    }
+}
+
 export default async (req, res) => {
+    // Actualizar canales.json antes de cualquier otra cosa
+    await updateCanalesJson();
+
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
