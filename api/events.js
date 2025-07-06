@@ -4,58 +4,40 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * PRIMER PASO: Scrapea y guarda la lista de canales desde la web en 'canales.json'.
- * Esta función se ejecutará antes que cualquier otra cosa.
+ * PRIMER PASO: Scrapea y devuelve la lista de canales desde la web (en memoria, no guarda archivo).
  */
-async function updateChannelsJson() {
+async function fetchChannelsObject() {
     const url = 'https://alangulotv.space/canal/';
-    // La ruta de salida debe coincidir con la que lee el resto del script.
-    const outputPath = path.join(process.cwd(), 'api', 'canales.json');
-
     console.log(`[SCRAPER] Iniciando actualización de canales desde: ${url}`);
-
     try {
         const response = await fetch(url, { timeout: 15000 });
         if (!response.ok) {
             throw new Error(`Error al acceder a la página de canales. Estado: ${response.status}`);
         }
         const html = await response.text();
-
-        // Expresión regular para encontrar y extraer el objeto 'channels'.
         const regex = /const\s+channels\s*=\s*(\{[\s\S]*?\});/;
         const match = html.match(regex);
-
         if (match && match[1]) {
             let channelsObjectString = match[1];
-
-            // Evaluar el objeto JS de forma segura
             let parsedObject;
             try {
                 // eslint-disable-next-line no-eval
                 parsedObject = eval('(' + channelsObjectString + ')');
             } catch (e) {
                 console.error('[SCRAPER] Error al evaluar el objeto channels:', e);
-                return;
+                return { canales: {} };
             }
-
-            // Aseguramos que el directorio 'api' exista antes de escribir.
-            const outputDir = path.dirname(outputPath);
-            if (!fs.existsSync(outputDir)) {
-                fs.mkdirSync(outputDir, { recursive: true });
-            }
-
-            const prettyJsonString = JSON.stringify({ canales: parsedObject }, null, 4);
-            fs.writeFileSync(outputPath, prettyJsonString, 'utf8');
-
-            console.log(`[SCRAPER] ¡Éxito! Canales guardados en: ${outputPath}`);
+            console.log(`[SCRAPER] ¡Éxito! Canales obtenidos en memoria.`);
+            return { canales: parsedObject };
         } else {
             console.error("[SCRAPER] No se pudo encontrar el objeto 'const channels' en el HTML.");
+            return { canales: {} };
         }
     } catch (error) {
-        console.error("[SCRAPER] Falló la actualización de canales. Se usará la versión local si existe.", error.message);
+        console.error("[SCRAPER] Falló la actualización de canales.", error.message);
+        return { canales: {} };
     }
 }
-
 
 /**
  * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
@@ -119,36 +101,22 @@ async function fetchStreamTpGlobalEvents() {
 /**
  * Función para hacer scraping de alangulotv usando Cheerio
  */
-async function fetchAlanGuloTVEvents(config) {
-    const { agendaUrl, linkDomain, baseOrigin } = config;
-    const canalesPath = path.join(process.cwd(), 'api', 'canales.json');
-    let canales = {};
-    try {
-        // Leemos el archivo JSON que la función de scraping acaba de actualizar.
-        canales = JSON.parse(fs.readFileSync(canalesPath, 'utf8'));
-    } catch (e) {
-        console.error('No se pudo cargar canales.json. Asegúrate de que el archivo exista y sea válido.', e);
-        canales = { canales: {} }; // Fallback a un objeto vacío.
-    }
-
+async function fetchAlanGuloTVEvents(config, canales) {
+    const { agendaUrl, linkDomain } = config;
     try {
         console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
-        
         const response = await fetch(agendaUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
             timeout: 15000
         });
-        
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
-        
         $('.match-container').each((index, element) => {
             try {
                 const $container = $(element);
@@ -228,15 +196,14 @@ export default async (req, res) => {
     }
 
     try {
-        // 1. Ejecutamos y esperamos a que el scraper de canales termine.
-        await updateChannelsJson();
-
+        // 1. Obtenemos la lista de canales en memoria
+        const canales = await fetchChannelsObject();
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
         const [streamTpEvents, alanGuloEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
-            fetchAlanGuloTVEvents(alanGuloConfig)
+            fetchAlanGuloTVEvents(alanGuloConfig, canales)
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
