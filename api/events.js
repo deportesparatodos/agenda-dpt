@@ -278,49 +278,74 @@ export default async (req, res) => {
         });
 
         const adaptedEvents = Array.from(eventMap.values());
-        // --- Agrupación inteligente de eventos de distintas fuentes ---
-        function normalizeTitle(title) {
-            return title.replace(/^(Fútbol:|Final:|Semifinal:|Cuartos:|Octavos:|Partido:|\s+)/i, '').trim().toLowerCase();
+        // --- AGRUPACIÓN AVANZADA DE EVENTOS ---
+        function normalizarTitulo(titulo) {
+            // Quita prefijos tipo "Primera División: " o similares
+            return titulo.replace(/^([\w\sÁÉÍÓÚáéíóúüÜñÑ]+: )/i, '').trim().toLowerCase();
         }
-        const mergedMap = new Map();
-        adaptedEvents.forEach(event => {
-            const normTitle = normalizeTitle(event.title);
-            const key = `${normTitle}__${event.time}`;
-            if (!mergedMap.has(key)) {
-                mergedMap.set(key, [event]);
-            } else {
-                mergedMap.get(key).push(event);
+        function diferenciaMinutos(hora1, hora2) {
+            // hora1 y hora2 en formato "HH:mm"
+            const [h1, m1] = hora1.split(':').map(Number);
+            const [h2, m2] = hora2.split(':').map(Number);
+            return Math.abs((h1 * 60 + m1) - (h2 * 60 + m2));
+        }
+        const agrupados = [];
+        for (const evento of allEvents) {
+            // Normaliza título para comparación
+            const tituloNorm = normalizarTitulo(evento.title || '');
+            // Busca si ya existe un evento agrupado compatible
+            let encontrado = null;
+            let idxEncontrado = -1;
+            for (let i = 0; i < agrupados.length; i++) {
+                const ev = agrupados[i];
+                const evNorm = normalizarTitulo(ev.title);
+                // Si los títulos normalizados coinciden y la hora es igual o difiere hasta 30 min
+                if (evNorm === tituloNorm && diferenciaMinutos(ev.time, evento.time) <= 30) {
+                    encontrado = ev;
+                    idxEncontrado = i;
+                    break;
+                }
             }
-        });
-        const mergedEvents = [];
-        for (const group of mergedMap.values()) {
-            if (group.length === 1) {
-                mergedEvents.push(group[0]);
+            if (encontrado) {
+                // Unir links y botones
+                if (evento.link && !encontrado.options.includes(evento.link)) {
+                    encontrado.options.push(evento.link);
+                }
+                if (evento.button && !encontrado.buttons.includes(evento.button)) {
+                    encontrado.buttons.push(evento.button);
+                }
+                // Preferir imagen de alangulotv
+                if (evento.source === 'alangulotv' && evento.image) {
+                    encontrado.image = evento.image;
+                }
+                // Usar el nombre más largo (con prefijo)
+                if ((evento.title || '').length > (encontrado.title || '').length) {
+                    encontrado.title = evento.title;
+                }
+                // Usar el horario más temprano
+                if (evento.time < encontrado.time) {
+                    encontrado.time = evento.time;
+                }
+                // Unir fuentes
+                if (!encontrado.source.includes(evento.source)) {
+                    encontrado.source += ',' + evento.source;
+                }
             } else {
-                // Unir eventos: nombre más largo, botones y opciones combinados, imagen de alangulotv si existe
-                let alangulotvEvent = group.find(e => e.source === 'alangulotv');
-                let title = group.reduce((a, b) => a.title.length >= b.title.length ? a : b).title;
-                let image = alangulotvEvent ? alangulotvEvent.image : group[0].image;
-                let options = [...new Set(group.flatMap(e => e.options))];
-                let buttons = group.flatMap(e => e.buttons);
-                let category = alangulotvEvent ? alangulotvEvent.category : group[0].category;
-                let language = alangulotvEvent ? alangulotvEvent.language : group[0].language;
-                let date = alangulotvEvent ? alangulotvEvent.date : group[0].date;
-                let time = group[0].time;
-                mergedEvents.push({
-                    time,
-                    title,
-                    options,
-                    buttons,
-                    category,
-                    language,
-                    date,
-                    source: 'multi',
-                    image
+                // Nuevo evento agrupado
+                agrupados.push({
+                    time: evento.time || '00:00',
+                    title: evento.title || 'Sin título',
+                    options: evento.link ? [evento.link] : [],
+                    buttons: evento.button ? [evento.button] : [],
+                    category: evento.category || 'Sin categoría',
+                    language: evento.language || 'Desconocido',
+                    date: evento.date || new Date().toISOString().split('T')[0],
+                    source: evento.source || 'unknown',
+                    image: evento.image || ''
                 });
             }
         }
-        return res.status(200).json(mergedEvents);
+        return res.status(200).json(agrupados);
     } catch (error) {
         console.error('Error en la función principal:', error);
         return res.status(500).json({ error: 'Error interno del servidor' });
