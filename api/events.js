@@ -1,10 +1,7 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
-// Se importa el archivo JSON con los canales directamente.
-// Es necesario asegurarse de que el entorno de ejecución (ej. Node.js >= 17.5)
-// soporte la importación de JSON modules (assert { type: 'json' }).
-// Si no, se debería usar 'fs' para leer el archivo de forma síncrona.
-import canales from './canales.json' assert { type: 'json' };
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
@@ -107,6 +104,16 @@ async function fetchStreamTpGlobalEvents() {
  */
 async function fetchAlanGuloTVEvents(config) {
     const { agendaUrl, linkDomain, baseOrigin } = config;
+    // Cargar canales.json de forma síncrona y segura
+    const canalesPath = path.join(process.cwd(), 'api', 'canales.json');
+    let canales = {};
+    try {
+        canales = JSON.parse(fs.readFileSync(canalesPath, 'utf8'));
+    } catch (e) {
+        console.error('No se pudo cargar canales.json:', e);
+        canales = { canales: {} };
+    }
+
     try {
         console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
         
@@ -254,7 +261,8 @@ async function fetchAlanGuloTVFallback(config) {
     const { agendaUrl, baseOrigin } = config;
 
     const response = await fetch(agendaUrl, {
-        headers: {
+        headers:
+         {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         },
         timeout: 10000
