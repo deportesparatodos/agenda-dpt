@@ -655,19 +655,34 @@ export default async (req, res) => {
         // Eliminar eventos sin botones/canales válidos
         adaptedEvents = adaptedEvents.filter(ev => Array.isArray(ev.options) && ev.options.length > 0 && Array.isArray(ev.buttons) && ev.buttons.length > 0);
 
-        // Cambiar todos los enlaces play.alangulotv.live por p.alangulotv.live en la API antes de devolver
+        // Cambiar todos los enlaces play.alangulotv.live por p.alangulotv.space en la API antes de devolver
         adaptedEvents.forEach(ev => {
             if (ev.options && Array.isArray(ev.options)) {
                 ev.options = ev.options.map(link => {
                     if (typeof link === 'string' && link.startsWith('https://play.alangulotv.live')) {
-                        link = link.replace('https://play.alangulotv.live', 'https://p.alangulotv.live');
+                        link = link.replace('https://play.alangulotv.live', 'https://p.alangulotv.space');
+                    }
+                    if (typeof link === 'string' && link.startsWith('https://p.alangulotv.live')) {
+                        link = link.replace('https://p.alangulotv.live', 'https://p.alangulotv.space');
                     }
                     // Reemplazo especial para foxdeportes
-                    if (link === 'https://p.alangulotv.live/?channel=foxdeportes') {
-                        return 'https://p.alangulotv.live/?channel=foxdeportes-a';
+                    if (link === 'https://p.alangulotv.space/?channel=foxdeportes') {
+                        return 'https://p.alangulotv.space/?channel=foxdeportes-a';
                     }
                     return link;
                 });
+            }
+            // Cambiar imágenes de alangulotv.live y p.alangulotv.live a p.alangulotv.space
+            if (ev.image && typeof ev.image === 'string') {
+                if (ev.image.startsWith('https://p.alangulotv.live')) {
+                    ev.image = ev.image.replace('https://p.alangulotv.live', 'https://p.alangulotv.space');
+                }
+                if (ev.image.startsWith('https://play.alangulotv.live')) {
+                    ev.image = ev.image.replace('https://play.alangulotv.live', 'https://p.alangulotv.space');
+                }
+                if (ev.image.startsWith('https://alangulotv.live')) {
+                    ev.image = ev.image.replace('https://alangulotv.live', 'https://p.alangulotv.space');
+                }
             }
         });
 
