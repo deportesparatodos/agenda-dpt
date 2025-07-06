@@ -655,24 +655,6 @@ export default async (req, res) => {
         // Eliminar eventos sin botones/canales válidos
         adaptedEvents = adaptedEvents.filter(ev => Array.isArray(ev.options) && ev.options.length > 0 && Array.isArray(ev.buttons) && ev.buttons.length > 0);
 
-        // Cambiar todos los enlaces e imágenes de p.alangulotv.live por p.alangulotv.space
-        agrupados.forEach(grupo => {
-            // Cambiar en las opciones (links de canales)
-            if (Array.isArray(grupo.options)) {
-                grupo.options = grupo.options.map(opt =>
-                    typeof opt === 'string' ? opt.replace(/https:\/\/p\.alangulotv\.live\//g, 'https://p.alangulotv.space/') : opt
-                );
-            }
-            // Cambiar en la imagen si corresponde
-            if (typeof grupo.image === 'string' && grupo.image.startsWith('https://p.alangulotv.live/')) {
-                grupo.image = grupo.image.replace('https://p.alangulotv.live/', 'https://p.alangulotv.space/');
-            }
-            // Reemplazo especial para foxdeportes
-            if (link === 'https://p.alangulotv.space/?channel=foxdeportes') {
-                return 'https://p.alangulotv.space/?channel=foxdeportes-a';
-            }
-        });
-
         // --- AGRUPACIÓN AVANZADA DE EVENTOS (idéntica al frontend, ahora con tolerancia de 15min) ---
         function quitarPrefijoTitulo(titulo) {
             if (!titulo) return '';
@@ -797,6 +779,27 @@ export default async (req, res) => {
             // 8. Si no tiene imagen, poner imagen por defecto
             if (!grupo.image) {
                 grupo.image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
+            }
+        }
+
+        // --- REEMPLAZO DE DOMINIO FINAL EN TODOS LOS LINKS E IMÁGENES ---
+        for (const grupo of agrupados) {
+            // Reemplazar en links de canales
+            if (Array.isArray(grupo.options)) {
+                grupo.options = grupo.options.map(link => {
+                    if (typeof link === 'string' && link.startsWith('https://p.alangulotv.live/')) {
+                        link = link.replace('https://p.alangulotv.live/', 'https://p.alangulotv.space/');
+                    }
+                    // Reemplazo especial para foxdeportes
+                    if (link === 'https://p.alangulotv.space/?channel=foxdeportes') {
+                        return 'https://p.alangulotv.space/?channel=foxdeportes-a';
+                    }
+                    return link;
+                });
+            }
+            // Reemplazar en imagen si corresponde
+            if (typeof grupo.image === 'string' && grupo.image.startsWith('https://p.alangulotv.live/')) {
+                grupo.image = grupo.image.replace('https://p.alangulotv.live/', 'https://p.alangulotv.space/');
             }
         }
 
