@@ -362,8 +362,8 @@ export default async (req, res) => {
                     buttonArr = [match ? match[1].toUpperCase() : 'CANAL'];
                     optionsArr = [event.link];
                 } else if (event.source === 'wearechecking' && Array.isArray(event.options) && event.options.length > 0) {
-                    buttonArr = event.options.map(opt => opt.name);
-                    optionsArr = event.options;
+                    buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
+                    optionsArr = event.options.map(opt => opt.link);
                 } else if (event.button) {
                     buttonArr = [event.button];
                     optionsArr = [event.link];
@@ -386,9 +386,9 @@ export default async (req, res) => {
                 const existing = eventMap.get(key);
                 if (event.source === 'wearechecking' && Array.isArray(event.options)) {
                     event.options.forEach(opt => {
-                        if (!existing.options.some(o => o.link === opt.link)) {
-                            existing.options.push(opt);
-                            existing.buttons.push(opt.name);
+                        if (!existing.options.includes(opt.link)) {
+                            existing.options.push(opt.link);
+                            existing.buttons.push((opt.name || 'CANAL').toUpperCase());
                         }
                     });
                 } else if (event.link && !existing.options.includes(event.link)) {
