@@ -212,9 +212,26 @@ async function fetchWeAreCheckingEvents() {
                 // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                    const visibleTime = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
-                    if (visibleTime) {
-                        time = visibleTime;
+                    let spanText = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
+                    // Si el texto es un número, es un timestamp y hay que formatearlo
+                    if (/^\d{10,}$/.test(spanText)) {
+                        const unix = parseInt(spanText);
+                        if (!isNaN(unix)) {
+                            const eventDate = new Date(unix * 1000);
+                            // Formato: 1 jul, 01:00 a.m.
+                            const day = eventDate.getDate();
+                            const month = eventDate.toLocaleString('es-ES', { month: 'short' });
+                            let hour = eventDate.getHours();
+                            const minute = eventDate.getMinutes();
+                            const ampm = hour < 12 ? 'a.m.' : 'p.m.';
+                            hour = hour % 12;
+                            if (hour === 0) hour = 12;
+                            const minuteStr = String(minute).padStart(2, '0');
+                            spanText = `${day} ${month}, ${hour}:${minuteStr} ${ampm}`;
+                        }
+                    }
+                    if (spanText) {
+                        time = spanText;
                     }
                     // El título es el texto después del span
                     title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
@@ -316,9 +333,26 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                    const visibleTime = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
-                    if (visibleTime) {
-                        time = visibleTime;
+                    let spanText = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
+                    // Si el texto es un número, es un timestamp y hay que formatearlo
+                    if (/^\d{10,}$/.test(spanText)) {
+                        const unix = parseInt(spanText);
+                        if (!isNaN(unix)) {
+                            const eventDate = new Date(unix * 1000);
+                            // Formato: 1 jul, 01:00 a.m.
+                            const day = eventDate.getDate();
+                            const month = eventDate.toLocaleString('es-ES', { month: 'short' });
+                            let hour = eventDate.getHours();
+                            const minute = eventDate.getMinutes();
+                            const ampm = hour < 12 ? 'a.m.' : 'p.m.';
+                            hour = hour % 12;
+                            if (hour === 0) hour = 12;
+                            const minuteStr = String(minute).padStart(2, '0');
+                            spanText = `${day} ${month}, ${hour}:${minuteStr} ${ampm}`;
+                        }
+                    }
+                    if (spanText) {
+                        time = spanText;
                     }
                     // El título es el texto después del span
                     title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
@@ -457,7 +491,7 @@ export default async (req, res) => {
                     event.options.forEach(opt => {
                         if (!existing.options.includes(opt.link)) {
                             existing.options.push(opt.link);
-                            existing.buttons.push((opt.name || 'CANAL').toUpperCase());
+                            existing.buttons.push(opt.name.toUpperCase());
                         }
                     });
                 } else if (event.link && !existing.options.includes(event.link)) {
