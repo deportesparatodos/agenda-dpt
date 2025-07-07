@@ -288,6 +288,86 @@ async function fetchWACLinksForEvent(eventUrl) {
     }
 }
 
+/**
+ * Scrapea eventos en vivo de wearechecking.online/streams-pages/motorsports
+ */
+async function fetchWeAreCheckingMotorsportsEvents() {
+    try {
+        const url = 'https://wearechecking.online/streams-pages/motorsports';
+        console.log('Fetching WeAreChecking Motorsports eventos desde', url);
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            timeout: 15000
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        const events = [];
+        const eventPromises = [];
+        // Buscar todos los stream-wrapper dentro de #streams-dynamic-container
+        $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
+            const $wrapper = $(el);
+            const $feed = $wrapper.find('.stream-feed');
+            const onclick = $feed.attr('onclick');
+            if (onclick && onclick.includes("location.href='/streams/")) {
+                // Extraer link
+                const match = onclick.match(/location.href='([^']+)'/);
+                const link = match ? `https://wearechecking.online${match[1]}` : '';
+                // Extraer título y hora
+                const $p = $feed.find('p');
+                let time = '00:00';
+                let date = new Date().toISOString().split('T')[0];
+                let title = $p.text().trim();
+                // Si hay unix-timestamp, lo convertimos
+                const $span = $p.find('.unix-timestamp');
+                if ($span.length) {
+                    const unix = parseInt($span.text());
+                    if (!isNaN(unix)) {
+                        const eventDate = new Date(unix * 1000);
+                        date = eventDate.toISOString().split('T')[0];
+                        time = eventDate.toTimeString().slice(0,5);
+                    }
+                    // El título es el texto después del span
+                    title = $p.text().replace($span.text(), '').trim();
+                }
+                // Imagen
+                let image = $wrapper.find('img.stream-thumb').attr('src') || '';
+                if (image && image.startsWith('..')) {
+                    image = 'https://wearechecking.online' + image.replace('..', '');
+                } else if (image && image.startsWith('/')) {
+                    image = 'https://wearechecking.online' + image;
+                }
+                // Promesa para obtener los links reales
+                const eventObj = {
+                    time,
+                    title,
+                    link, // link a la página del evento
+                    button: 'WAC',
+                    category: 'Motorsports',
+                    language: 'Inglés',
+                    date,
+                    source: 'wearechecking-motorsports',
+                    image,
+                    options: [] // se llenará luego
+                };
+                const p = fetchWACLinksForEvent(link).then(options => {
+                    eventObj.options = options;
+                    return eventObj;
+                });
+                eventPromises.push(p);
+            }
+        });
+        const results = await Promise.all(eventPromises);
+        // Solo eventos con al menos una opción válida
+        return results.filter(ev => ev.options && ev.options.length > 0);
+    } catch (error) {
+        console.error('Error al obtener eventos de WeAreChecking Motorsports:', error);
+        return [];
+    }
+}
+
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -309,21 +389,24 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents, wacEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
-            fetchWeAreCheckingEvents()
+            fetchWeAreCheckingEvents(),
+            fetchWeAreCheckingMotorsportsEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
         const alanEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
+        const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
+        if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
