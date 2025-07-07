@@ -209,17 +209,15 @@ async function fetchWeAreCheckingEvents() {
                 let time = '00:00';
                 let date = new Date().toISOString().split('T')[0];
                 let title = $p.text().trim();
-                // Si hay unix-timestamp, lo convertimos
+                // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                    const unix = parseInt($span.text());
-                    if (!isNaN(unix)) {
-                        const eventDate = new Date(unix * 1000);
-                        date = eventDate.toISOString().split('T')[0];
-                        time = eventDate.toTimeString().slice(0,5);
+                    const visibleTime = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
+                    if (visibleTime) {
+                        time = visibleTime;
                     }
                     // El título es el texto después del span
-                    title = $p.text().replace($span.text(), '').trim();
+                    title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
                 }
                 // Imagen FIJA para others
                 let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
@@ -315,17 +313,15 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 let time = '00:00';
                 let date = new Date().toISOString().split('T')[0];
                 let title = $p.text().trim();
-                // Si hay unix-timestamp, lo convertimos
+                // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                    const unix = parseInt($span.text());
-                    if (!isNaN(unix)) {
-                        const eventDate = new Date(unix * 1000);
-                        date = eventDate.toISOString().split('T')[0];
-                        time = eventDate.toTimeString().slice(0,5);
+                    const visibleTime = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
+                    if (visibleTime) {
+                        time = visibleTime;
                     }
                     // El título es el texto después del span
-                    title = $p.text().replace($span.text(), '').trim();
+                    title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
                 }
                 // Imagen FIJA para motorsports
                 let image = 'https://static.vecteezy.com/system/resources/previews/001/193/929/non_2x/vintage-car-png.png';
