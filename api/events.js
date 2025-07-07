@@ -259,6 +259,7 @@ export default async (req, res) => {
                     category: event.category || 'Sin categoría',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
+                    eventDay: event.date || new Date().toISOString().split('T')[0], // Nuevo campo con la fecha del evento
                     source: event.source || 'unknown',
                     image: event.image || ''
                 });
