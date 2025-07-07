@@ -356,29 +356,42 @@ export default async (req, res) => {
             const key = `${event.title || 'Sin título'}__${event.time || '00:00'}__${event.source}`;
             if (!eventMap.has(key)) {
                 let buttonArr = [];
+                let optionsArr = [];
                 if (event.source === 'streamtpglobal' && event.link) {
                     const match = event.link.match(/[?&]stream=([^&#]+)/i);
                     buttonArr = [match ? match[1].toUpperCase() : 'CANAL'];
+                    optionsArr = [event.link];
+                } else if (event.source === 'wearechecking' && Array.isArray(event.options) && event.options.length > 0) {
+                    buttonArr = event.options.map(opt => opt.name);
+                    optionsArr = event.options;
                 } else if (event.button) {
                     buttonArr = [event.button];
+                    optionsArr = [event.link];
                 } else {
-                    buttonArr = [];
+                    optionsArr = [event.link];
                 }
                 eventMap.set(key, {
                     time: event.time || '00:00',
                     title: event.title || 'Sin título',
-                    options: [event.link],
+                    options: optionsArr,
                     buttons: buttonArr,
                     category: event.category || 'Sin categoría',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
-                    eventDay: event.date || new Date().toISOString().split('T')[0], // Nuevo campo con la fecha del evento
+                    eventDay: event.date || new Date().toISOString().split('T')[0],
                     source: event.source || 'unknown',
                     image: event.image || ''
                 });
             } else {
                 const existing = eventMap.get(key);
-                if (event.link && !existing.options.includes(event.link)) {
+                if (event.source === 'wearechecking' && Array.isArray(event.options)) {
+                    event.options.forEach(opt => {
+                        if (!existing.options.some(o => o.link === opt.link)) {
+                            existing.options.push(opt);
+                            existing.buttons.push(opt.name);
+                        }
+                    });
+                } else if (event.link && !existing.options.includes(event.link)) {
                     existing.options.push(event.link);
                     if (event.button) existing.buttons.push(event.button);
                 }
