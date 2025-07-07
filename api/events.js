@@ -178,6 +178,80 @@ async function fetchAlanGuloTVEvents(config, canales) {
     }
 }
 
+/**
+ * Función para hacer scraping de eventos en vivo de wearechecking.online
+ */
+async function fetchWeAreCheckingEvents() {
+    try {
+        const url = 'https://wearechecking.online/streams-pages/others';
+        console.log(`[SCRAPER] Fetching WeAreChecking events from: ${url}`);
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            timeout: 15000
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        const events = [];
+        // Busca todos los eventos en vivo en la sección #other-streams
+        $('#other-streams .stream-wrapper').each((i, el) => {
+            const $wrapper = $(el);
+            const $feed = $wrapper.find('.stream-feed[onclick]');
+            if ($feed.length > 0) {
+                // Extrae el link del evento
+                const onclick = $feed.attr('onclick');
+                const linkMatch = onclick && onclick.match(/location.href='([^']+)'/);
+                const link = linkMatch ? `https://wearechecking.online${linkMatch[1]}` : null;
+                // Extrae el título y timestamp
+                const $p = $feed.find('p');
+                let title = $p.text().trim();
+                let time = '00:00';
+                let date = new Date().toISOString().split('T')[0];
+                // Si hay un span.unix-timestamp, úsalo para la fecha y hora
+                const $span = $p.find('.unix-timestamp');
+                if ($span.length > 0) {
+                    const unix = parseInt($span.text());
+                    if (!isNaN(unix)) {
+                        const eventDate = new Date(unix * 1000);
+                        date = eventDate.toISOString().split('T')[0];
+                        time = eventDate.toTimeString().slice(0,5);
+                    }
+                    // Elimina el timestamp del título
+                    title = title.replace($span.text(), '').trim();
+                }
+                // Imagen del evento
+                const image = $wrapper.find('.stream-thumb').attr('src')
+                    ? `https://wearechecking.online${$wrapper.find('.stream-thumb').attr('src').replace('..','')}`
+                    : '';
+                // Categoría (por el nombre de la clase wrapper-*)
+                const wrapperClass = $wrapper.attr('class') || '';
+                const categoryMatch = wrapperClass.match(/wrapper-([\w-]+)/);
+                const category = categoryMatch ? categoryMatch[1] : 'Other';
+                if (link && title) {
+                    events.push({
+                        time,
+                        title,
+                        link,
+                        button: 'VER',
+                        category,
+                        language: 'Inglés',
+                        date,
+                        source: 'wearechecking',
+                        image
+                    });
+                }
+            }
+        });
+        console.log(`[SCRAPER] WeAreChecking: ${events.length} eventos en vivo encontrados.`);
+        return events;
+    } catch (error) {
+        console.error('[SCRAPER] Error al obtener eventos de WeAreChecking:', error);
+        return [];
+    }
+}
+
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -199,18 +273,20 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, weAreCheckingEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
-            fetchAlanGuloTVEvents(alanGuloConfig, canales)
+            fetchAlanGuloTVEvents(alanGuloConfig, canales),
+            fetchWeAreCheckingEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
         const alanEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
-        
+        const wacEvents = weAreCheckingEvents.status === 'fulfilled' ? weAreCheckingEvents.value : [];
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
+        if (weAreCheckingEvents.status === 'rejected') console.error('WeAreChecking falló:', weAreCheckingEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents];
+        const allEvents = [...streamEvents, ...alanEvents, ...wacEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
