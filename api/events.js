@@ -388,6 +388,95 @@ async function fetchWeAreCheckingMotorsportsEvents() {
     }
 }
 
+/**
+ * Scrapea eventos en vivo de wearechecking.online/streams-pages/football
+ */
+async function fetchWeAreCheckingFootballEvents() {
+    try {
+        const url = 'https://wearechecking.online/streams-pages/football';
+        console.log('Fetching WeAreChecking Football eventos desde', url);
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            timeout: 15000
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        const events = [];
+        const eventPromises = [];
+        $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
+            const $wrapper = $(el);
+            const $feed = $wrapper.find('.stream-feed');
+            const onclick = $feed.attr('onclick');
+            if (onclick && onclick.includes("location.href='/streams/")) {
+                // Extraer link
+                const match = onclick.match(/location.href='([^']+)'/);
+                const link = match ? `https://wearechecking.online${match[1]}` : '';
+                // Extraer título y hora
+                const $p = $feed.find('p');
+                let time = '00:00';
+                let date = new Date().toISOString().split('T')[0];
+                let title = $p.text().trim();
+                // Si hay unix-timestamp, usar el texto visible del span como hora
+                const $span = $p.find('.unix-timestamp');
+                if ($span.length) {
+                    let spanText = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
+                    // Si el texto es un número, es un timestamp y hay que formatearlo
+                    if (/^\d{10,}$/.test(spanText)) {
+                        const unix = parseInt(spanText);
+                        if (!isNaN(unix)) {
+                            const eventDate = new Date(unix * 1000);
+                            // Formato: 1 jul, 01:00 a.m.
+                            const day = eventDate.getDate();
+                            const month = eventDate.toLocaleString('es-ES', { month: 'short' });
+                            let hour = eventDate.getHours();
+                            const minute = eventDate.getMinutes();
+                            const ampm = hour < 12 ? 'a.m.' : 'p.m.';
+                            hour = hour % 12;
+                            if (hour === 0) hour = 12;
+                            const minuteStr = String(minute).padStart(2, '0');
+                            spanText = `${day} ${month}, ${hour}:${minuteStr} ${ampm}`;
+                        }
+                    }
+                    if (spanText) {
+                        time = spanText;
+                    }
+                    // El título es el texto después del span
+                    title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
+                }
+                // Imagen FIJA para football
+                let image = 'https://static.vecteezy.com/system/resources/previews/012/996/773/non_2x/sport-ball-football-free-png.png';
+                // Promesa para obtener los links reales
+                const eventObj = {
+                    time,
+                    title,
+                    link, // link a la página del evento
+                    button: 'WAC',
+                    category: 'Football',
+                    language: 'Inglés',
+                    date,
+                    source: 'wearechecking-football',
+                    image,
+                    options: [] // se llenará luego
+                };
+                const p = fetchWACLinksForEvent(link).then(options => {
+                    eventObj.options = options;
+                    return eventObj;
+                });
+                eventPromises.push(p);
+            }
+        });
+        const results = await Promise.all(eventPromises);
+        // Solo eventos con al menos una opción válida
+        return results.filter(ev => ev.options && ev.options.length > 0);
+    } catch (error) {
+        console.error('Error al obtener eventos de WeAreChecking Football:', error);
+        return [];
+    }
+}
+
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -409,24 +498,27 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingEvents(),
-            fetchWeAreCheckingMotorsportsEvents()
+            fetchWeAreCheckingMotorsportsEvents(),
+            fetchWeAreCheckingFootballEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
         const alanEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
+        const wearecheckingFootballEvents = wacFootballEvents.status === 'fulfilled' ? wacFootballEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
+        if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
