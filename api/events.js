@@ -276,17 +276,17 @@ async function fetchWeAreCheckingIframes(eventUrl) {
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         const html = await response.text();
         const $ = cheerio.load(html);
-        // Extrae todos los src de los iframes
-        const iframes = [];
-        $('iframe').each((i, el) => {
-            const src = $(el).attr('src');
-            if (src && src.startsWith('http')) {
-                iframes.push(src);
-            } else if (src && src.startsWith('/')) {
-                iframes.push(`https://wearechecking.online${src}`);
+        // Extrae todos los links de los botones feed-button
+        const links = [];
+        $('.feed-button[onclick]').each((i, el) => {
+            const onclick = $(el).attr('onclick');
+            // Busca el link dentro del onclick
+            const match = onclick && onclick.match(/src\s*=\s*'([^']+)'/);
+            if (match && match[1]) {
+                links.push(match[1]);
             }
         });
-        return iframes;
+        return links;
     } catch (error) {
         console.error(`[SCRAPER] Error al extraer iframes de ${eventUrl}:`, error);
         return [];
