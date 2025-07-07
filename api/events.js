@@ -221,13 +221,8 @@ async function fetchWeAreCheckingEvents() {
                     // El título es el texto después del span
                     title = $p.text().replace($span.text(), '').trim();
                 }
-                // Imagen
-                let image = $wrapper.find('img.stream-thumb').attr('src') || '';
-                if (image && image.startsWith('..')) {
-                    image = 'https://wearechecking.online' + image.replace('..', '');
-                } else if (image && image.startsWith('/')) {
-                    image = 'https://wearechecking.online' + image;
-                }
+                // Imagen FIJA para others
+                let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
                 // Promesa para obtener los links reales
                 const eventObj = {
                     time,
@@ -332,13 +327,8 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     // El título es el texto después del span
                     title = $p.text().replace($span.text(), '').trim();
                 }
-                // Imagen
-                let image = $wrapper.find('img.stream-thumb').attr('src') || '';
-                if (image && image.startsWith('..')) {
-                    image = 'https://wearechecking.online' + image.replace('..', '');
-                } else if (image && image.startsWith('/')) {
-                    image = 'https://wearechecking.online' + image;
-                }
+                // Imagen FIJA para motorsports
+                let image = 'https://static.vecteezy.com/system/resources/previews/001/193/929/non_2x/vintage-car-png.png';
                 // Promesa para obtener los links reales
                 const eventObj = {
                     time,
