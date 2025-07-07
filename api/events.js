@@ -196,6 +196,7 @@ async function fetchWeAreCheckingEvents() {
         const $ = cheerio.load(html);
         const events = [];
         // Busca todos los eventos en vivo en la sección #other-streams
+        const eventPromises = [];
         $('#other-streams .stream-wrapper').each((i, el) => {
             const $wrapper = $(el);
             const $feed = $wrapper.find('.stream-feed[onclick]');
@@ -230,24 +231,64 @@ async function fetchWeAreCheckingEvents() {
                 const categoryMatch = wrapperClass.match(/wrapper-([\w-]+)/);
                 const category = categoryMatch ? categoryMatch[1] : 'Other';
                 if (link && title) {
-                    events.push({
-                        time,
-                        title,
-                        link,
-                        button: 'VER',
-                        category,
-                        language: 'Inglés',
-                        date,
-                        source: 'wearechecking',
-                        image
-                    });
+                    // Promesa para extraer los iframes
+                    eventPromises.push(
+                        fetchWeAreCheckingIframes(link).then(iframes => {
+                            if (iframes.length > 0) {
+                                events.push({
+                                    time,
+                                    title,
+                                    link: '', // No mostrar el link directo
+                                    options: iframes, // iframes como opciones
+                                    button: 'VER',
+                                    category,
+                                    language: 'Inglés',
+                                    date,
+                                    source: 'wearechecking',
+                                    image
+                                });
+                            }
+                        })
+                    );
                 }
             }
         });
-        console.log(`[SCRAPER] WeAreChecking: ${events.length} eventos en vivo encontrados.`);
+        await Promise.all(eventPromises);
+        console.log(`[SCRAPER] WeAreChecking: ${events.length} eventos en vivo encontrados con iframes.`);
         return events;
     } catch (error) {
         console.error('[SCRAPER] Error al obtener eventos de WeAreChecking:', error);
+        return [];
+    }
+}
+
+/**
+ * Función para extraer los iframes de cada link de evento de wearechecking
+ */
+async function fetchWeAreCheckingIframes(eventUrl) {
+    try {
+        const response = await fetch(eventUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            timeout: 15000
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        // Extrae todos los src de los iframes
+        const iframes = [];
+        $('iframe').each((i, el) => {
+            const src = $(el).attr('src');
+            if (src && src.startsWith('http')) {
+                iframes.push(src);
+            } else if (src && src.startsWith('/')) {
+                iframes.push(`https://wearechecking.online${src}`);
+            }
+        });
+        return iframes;
+    } catch (error) {
+        console.error(`[SCRAPER] Error al extraer iframes de ${eventUrl}:`, error);
         return [];
     }
 }
