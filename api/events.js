@@ -233,14 +233,14 @@ async function fetchWeAreCheckingEvents() {
                 if (link && title) {
                     // Promesa para extraer los iframes
                     eventPromises.push(
-                        fetchWeAreCheckingIframes(link).then(iframes => {
-                            if (iframes.length > 0) {
+                        fetchWeAreCheckingIframes(link).then(buttonsArr => {
+                            if (buttonsArr.length > 0) {
                                 events.push({
                                     time,
                                     title,
-                                    link: '', // No mostrar el link directo
-                                    options: iframes, // iframes como opciones
-                                    button: 'VER',
+                                    link: '',
+                                    options: buttonsArr.map(b => b.url),
+                                    buttons: buttonsArr.map(b => b.name),
                                     category,
                                     language: 'Inglés',
                                     date,
@@ -254,7 +254,7 @@ async function fetchWeAreCheckingEvents() {
             }
         });
         await Promise.all(eventPromises);
-        console.log(`[SCRAPER] WeAreChecking: ${events.length} eventos en vivo encontrados con iframes.`);
+        console.log(`[SCRAPER] WeAreChecking: ${events.length} eventos en vivo encontrados con botones y links.`);
         return events;
     } catch (error) {
         console.error('[SCRAPER] Error al obtener eventos de WeAreChecking:', error);
@@ -276,14 +276,15 @@ async function fetchWeAreCheckingIframes(eventUrl) {
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         const html = await response.text();
         const $ = cheerio.load(html);
-        // Extrae todos los links de los botones feed-button
+        // Extrae todos los botones feed-button y saca nombre y url
         const links = [];
         $('.feed-button[onclick]').each((i, el) => {
             const onclick = $(el).attr('onclick');
-            // Busca el link dentro del onclick
             const match = onclick && onclick.match(/src\s*=\s*'([^']+)'/);
-            if (match && match[1]) {
-                links.push(match[1]);
+            const url = match && match[1] ? match[1] : null;
+            const name = $(el).find('p').text().trim();
+            if (url && name) {
+                links.push({ name, url });
             }
         });
         return links;
