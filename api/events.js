@@ -160,6 +160,32 @@ async function fetchAlanGuloTVEvents(config, canales) {
                                             source: 'alangulotv',
                                             image: imageUrl
                                         });
+                                        return; // Si ya se encontró, no buscar más
+                                    }
+                                }
+                            }
+                            // Si no se encontró link válido, intentar con guion
+                            if (linkKey && canales.canales) {
+                                // Solo si no se encontró antes
+                                const linkKeyWithDash = linkKey.replace(/(\d+)/, '-$1');
+                                if (canales.canales[linkKeyWithDash]) {
+                                    const channelData = canales.canales[linkKeyWithDash];
+                                    const firstAvailableKey = Object.keys(channelData)[0];
+                                    if (firstAvailableKey) {
+                                        const finalLink = channelData[firstAvailableKey];
+                                        if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
+                                            events.push({
+                                                time,
+                                                title,
+                                                link: finalLink,
+                                                button: buttonName,
+                                                category: 'Deportes',
+                                                language: 'Español',
+                                                date: new Date().toISOString().split('T')[0],
+                                                source: 'alangulotv',
+                                                image: imageUrl
+                                            });
+                                        }
                                     }
                                 }
                             }
