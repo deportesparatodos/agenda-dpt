@@ -143,6 +143,7 @@ async function fetchAlanGuloTVEvents(config, canales) {
                         if (href) {
                             const pathParts = href.split('/').filter(part => part.length > 0);
                             const linkKey = pathParts[pathParts.length - 1];
+                            // Lógica normal
                             if (linkKey && canales.canales && canales.canales[linkKey]) {
                                 const channelData = canales.canales[linkKey];
                                 const firstAvailableKey = Object.keys(channelData)[0];
@@ -161,6 +162,31 @@ async function fetchAlanGuloTVEvents(config, canales) {
                                             image: imageUrl
                                         });
                                         return; // Si ya se encontró, no buscar más
+                                    }
+                                }
+                            }
+                            // Lógica especial para transmi-1, transmi-2, ...
+                            const transmiMatch = linkKey.match(/^transmi-(\d+)$/);
+                            if (transmiMatch && canales.canales && canales.canales['espn']) {
+                                const channelData = canales.canales['espn'];
+                                const firstAvailableKey = Object.keys(channelData)[0];
+                                if (firstAvailableKey) {
+                                    let finalLink = channelData[firstAvailableKey];
+                                    if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
+                                        // Reemplazar la última parte del link por transmi1, transmi2, ...
+                                        finalLink = finalLink.replace(/([\w-]+)$/i, `transmi${transmiMatch[1]}`);
+                                        events.push({
+                                            time,
+                                            title,
+                                            link: finalLink,
+                                            button: buttonName,
+                                            category: 'Deportes',
+                                            language: 'Español',
+                                            date: new Date().toISOString().split('T')[0],
+                                            source: 'alangulotv',
+                                            image: imageUrl
+                                        });
+                                        return;
                                     }
                                 }
                             }
