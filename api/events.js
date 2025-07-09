@@ -164,31 +164,6 @@ async function fetchAlanGuloTVEvents(config, canales) {
                                     }
                                 }
                             }
-                            // Si no se encontró link válido, intentar con guion
-                            if (linkKey && canales.canales) {
-                                // Solo si no se encontró antes
-                                const linkKeyWithDash = linkKey.replace(/(\d+)/, '-$1');
-                                if (canales.canales[linkKeyWithDash]) {
-                                    const channelData = canales.canales[linkKeyWithDash];
-                                    const firstAvailableKey = Object.keys(channelData)[0];
-                                    if (firstAvailableKey) {
-                                        const finalLink = channelData[firstAvailableKey];
-                                        if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
-                                            events.push({
-                                                time,
-                                                title,
-                                                link: finalLink,
-                                                button: buttonName,
-                                                category: 'Deportes',
-                                                language: 'Español',
-                                                date: new Date().toISOString().split('T')[0],
-                                                source: 'alangulotv',
-                                                image: imageUrl
-                                            });
-                                        }
-                                    }
-                                }
-                            }
                         }
                     });
                 }
@@ -614,7 +589,7 @@ export default async (req, res) => {
                             existing.buttons.push(opt.name.toUpperCase());
                         }
                     });
-                } else if (event.link && event.link.trim() !== '' && !existing.options.includes(event.link)) {
+                } else if (event.link && !existing.options.includes(event.link)) {
                     existing.options.push(event.link);
                     if (event.button) existing.buttons.push(event.button);
                 }
