@@ -267,29 +267,30 @@ async function fetchWeAreCheckingEvents() {
                 }
                 // Imagen FIJA para others
                 let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
-                // Promesa para obtener los links reales
-                const eventObj = {
-                    time,
-                    title,
-                    link, // link a la página del evento
-                    button: 'WAC',
-                    category: 'Otros',
-                    language: 'Inglés',
-                    date,
-                    source: 'wearechecking',
-                    image,
-                    options: [] // se llenará luego
-                };
+                // Aquí se hace la petición para extraer los links reales del evento
                 const p = fetchWACLinksForEvent(link).then(options => {
-                    eventObj.options = options;
-                    return eventObj;
+                    if (Array.isArray(options) && options.length > 0) {
+                        return {
+                            time,
+                            title,
+                            link, // link a la página del evento
+                            button: 'WAC',
+                            category: 'Otros',
+                            language: 'Inglés',
+                            date,
+                            source: 'wearechecking',
+                            image,
+                            options // links y nombres extraídos de la página interna
+                        };
+                    }
+                    return null; // descartar eventos sin opciones válidas
                 });
                 eventPromises.push(p);
             }
         });
         const results = await Promise.all(eventPromises);
         // Solo eventos con al menos una opción válida
-        return results.filter(ev => ev.options && ev.options.length > 0);
+        return results.filter(ev => ev && ev.options && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de WeAreChecking:', error);
         return [];
