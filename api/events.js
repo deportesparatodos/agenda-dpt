@@ -565,11 +565,19 @@ export default async (req, res) => {
             if (event.time) {
                 const timeParts = event.time.split(':');
                 if (timeParts.length >= 2) {
-                    const hour = parseInt(timeParts[0]);
+                    let hour = parseInt(timeParts[0]);
                     const minute = parseInt(timeParts[1]);
                     let newHour = hour;
                     if (event.source === 'streamtpglobal') {
                         newHour = hour + 2;
+                        if (newHour >= 24) newHour -= 24;
+                        event.time = `${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+                    } else if (
+                        event.source === 'wearechecking' ||
+                        event.source === 'wearechecking-football' ||
+                        event.source === 'wearechecking-motorsports'
+                    ) {
+                        newHour = hour + 7;
                         if (newHour >= 24) newHour -= 24;
                         event.time = `${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
                     } else {
