@@ -267,30 +267,29 @@ async function fetchWeAreCheckingEvents() {
                 }
                 // Imagen FIJA para others
                 let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
-                // Aquí se hace la petición para extraer los links reales del evento
+                // Promesa para obtener los links reales
+                const eventObj = {
+                    time,
+                    title,
+                    link, // link a la página del evento
+                    button: 'WAC',
+                    category: 'Otros',
+                    language: 'Inglés',
+                    date,
+                    source: 'wearechecking',
+                    image,
+                    options: [] // se llenará luego
+                };
                 const p = fetchWACLinksForEvent(link).then(options => {
-                    if (Array.isArray(options) && options.length > 0) {
-                        return {
-                            time,
-                            title,
-                            link, // link a la página del evento
-                            button: 'WAC',
-                            category: 'Otros',
-                            language: 'Inglés',
-                            date,
-                            source: 'wearechecking',
-                            image,
-                            options // links y nombres extraídos de la página interna
-                        };
-                    }
-                    return null; // descartar eventos sin opciones válidas
+                    eventObj.options = options;
+                    return eventObj;
                 });
                 eventPromises.push(p);
             }
         });
         const results = await Promise.all(eventPromises);
         // Solo eventos con al menos una opción válida
-        return results.filter(ev => ev && ev.options && ev.options.length > 0);
+        return results.filter(ev => ev.options && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de WeAreChecking:', error);
         return [];
@@ -586,7 +585,7 @@ export default async (req, res) => {
                     const match = event.link.match(/[?&]stream=([^&#]+)/i);
                     buttonArr = [match ? match[1].toUpperCase() : 'CANAL'];
                     optionsArr = [event.link];
-                } else if (event.source === 'wearechecking' && Array.isArray(event.options) && event.options.length > 0) {
+                } else if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports') && Array.isArray(event.options) && event.options.length > 0) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
                 } else if (event.button) {
@@ -609,7 +608,7 @@ export default async (req, res) => {
                 });
             } else {
                 const existing = eventMap.get(key);
-                if (event.source === 'wearechecking' && Array.isArray(event.options)) {
+                if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports') && Array.isArray(event.options)) {
                     event.options.forEach(opt => {
                         if (!existing.options.includes(opt.link)) {
                             existing.options.push(opt.link);
