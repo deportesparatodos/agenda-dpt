@@ -378,10 +378,12 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                             if (hour === 0) hour = 12;
                             const minuteStr = String(minute).padStart(2, '0');
                             spanText = `${day} ${month}, ${hour}:${minuteStr} ${ampm}`;
+                            // También guardar el horario en formato HH:mm para la API
+                            time = `${String(eventDate.getHours()).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
                         }
                     }
                     if (spanText) {
-                        time = spanText;
+                        // time = spanText; // Solo si quieres el formato bonito, pero para la API mejor HH:mm
                     }
                     // El título es el texto después del span
                     title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
