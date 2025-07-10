@@ -372,12 +372,23 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 const $p = $feed.find('p');
                 // Si no hay <p> o dice "No events", saltar
                 if ($p.length === 0 || /No events/i.test($p.text())) return;
-                // Extraer hora y título
+                // Extraer hora y fecha desde el span
                 let time = '00:00';
+                let eventDate = '';
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                    time = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                    // Ejemplo: "11 jul, 02:40 a.m. ￨ "
+                    let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                    // Separar fecha y hora
+                    const fechaHoraMatch = spanText.match(/^(\d{1,2} \w{3}), (\d{2}:\d{2} [ap]\.m\.)/i);
+                    if (fechaHoraMatch) {
+                        eventDate = fechaHoraMatch[1]; // "11 jul"
+                        time = fechaHoraMatch[2];     // "02:40 a.m."
+                    } else {
+                        // Si no matchea, usar todo el span como hora
+                        time = spanText;
+                    }
                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                 }
                 let date = new Date().toISOString().split('T')[0];
@@ -389,6 +400,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     category,
                     language: 'Inglés',
                     date,
+                    eventDate: eventDate || '', // NUEVO: fecha legible del evento
                     source: 'wearechecking-motorsports',
                     image,
                     options: []
