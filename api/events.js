@@ -345,49 +345,60 @@ async function fetchWeAreCheckingMotorsportsEvents() {
         const $ = cheerio.load(html);
         const events = [];
         const eventPromises = [];
-        // Buscar todos los stream-wrapper dentro de #streams-dynamic-container
+        // Recorrer todos los stream-wrapper de motorsports
         $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
             const $wrapper = $(el);
-            const $feed = $wrapper.find('.stream-feed');
-            const onclick = $feed.attr('onclick');
-            if (onclick && onclick.includes("location.href='/streams/")) {
-                // Extraer link
-                const match = onclick.match(/location.href='([^']+)'/);
+            // Imagen de la categoría
+            let image = $wrapper.find('.stream-thumb').attr('src') || '';
+            if (image && image.startsWith('..')) {
+                image = 'https://wearechecking.online/' + image.replace(/^\.\./, '').replace(/^\//, '');
+            } else if (image && image.startsWith('/')) {
+                image = 'https://wearechecking.online' + image;
+            }
+            // Nombre de la categoría
+            let category = $wrapper.find('.series-title img').attr('alt') || '';
+            if (category) {
+                category = category.replace(/^(series-title-)?/i, '').replace(/\.svg$/i, '').replace(/[-_]/g, ' ').trim();
+                category = category.charAt(0).toUpperCase() + category.slice(1);
+            } else {
+                category = 'Motorsports';
+            }
+            // Recorrer todos los .stream-feed con onclick (eventos reales)
+            $wrapper.find('.stream-feed[onclick]').each((j, feedEl) => {
+                const $feed = $(feedEl);
+                const onclick = $feed.attr('onclick');
+                const match = onclick ? onclick.match(/location.href='([^']+)'/) : null;
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
-                // Extraer título y hora
                 const $p = $feed.find('p');
+                // Si no hay <p> o dice "No events", saltar
+                if ($p.length === 0 || /No events/i.test($p.text())) return;
+                // Extraer hora y título
                 let time = '00:00';
-                let date = new Date().toISOString().split('T')[0];
                 let title = $p.text().trim();
-                // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                    // Extraer la hora como texto legible (no timestamp)
-                    time = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF| ￨ |\\|/g, '').trim();
-                    // El título es el texto después del span, limpiando separadores
+                    time = $span.text().replace(/ ￨ |\\|/g, '').trim();
                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                 }
-                // Imagen FIJA para motorsports
-                let image = 'https://static.vecteezy.com/system/resources/previews/001/193/929/non_2x/vintage-car-png.png';
-                // Promesa para obtener los links reales
+                let date = new Date().toISOString().split('T')[0];
                 const eventObj = {
                     time,
                     title,
-                    link, // link a la página del evento
+                    link,
                     button: 'WAC',
-                    category: 'Motorsports',
+                    category,
                     language: 'Inglés',
                     date,
                     source: 'wearechecking-motorsports',
                     image,
-                    options: [] // se llenará luego
+                    options: []
                 };
                 const p = fetchWACLinksForEvent(link).then(options => {
                     eventObj.options = options;
                     return eventObj;
                 });
                 eventPromises.push(p);
-            }
+            });
         });
         const results = await Promise.all(eventPromises);
         // Solo eventos con al menos una opción válida
