@@ -362,7 +362,9 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                    time = $span.text().replace(/ ￨ |\|/g, '').trim();
+                    // Extraer la hora como texto legible (no timestamp)
+                    time = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF| ￨ |\\|/g, '').trim();
+                    // El título es el texto después del span, limpiando separadores
                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                 }
                 // Imagen FIJA para motorsports
