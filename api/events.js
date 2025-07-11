@@ -381,10 +381,15 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     // Ejemplo: "11 jul, 02:40 a.m. ￨ "
                     let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
                     // Separar fecha y hora
-                    const fechaHoraMatch = spanText.match(/^(\d{1,2} \w{3}), (\d{2}:\d{2} [ap]\.m\.)/i);
+                    const fechaHoraMatch = spanText.match(/^(\d{1,2} \w{3}), (\d{2}):(\d{2}) ([ap])\.m\./i);
                     if (fechaHoraMatch) {
                         eventDate = fechaHoraMatch[1]; // "11 jul"
-                        time = fechaHoraMatch[2];     // "02:40 a.m."
+                        let hour = parseInt(fechaHoraMatch[2], 10);
+                        const minute = fechaHoraMatch[3];
+                        const ampm = fechaHoraMatch[4].toLowerCase();
+                        if (ampm === 'p' && hour !== 12) hour += 12;
+                        if (ampm === 'a' && hour === 12) hour = 0;
+                        time = `${String(hour).padStart(2, '0')}:${minute}`;
                     } else {
                         // Si no matchea, usar todo el span como hora
                         time = spanText;
