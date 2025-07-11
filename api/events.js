@@ -574,10 +574,12 @@ async function fetchFBStreamsMotorsportsEvents(html) {
     const category = 'Motorsports';
     const language = 'Inglés';
     let currentDate = null;
-    // Función para normalizar fechas tipo "Jul 12th, 2025" a "2025-07-12"
+    // Normaliza fechas tipo "2025-07-12" a "YYYY-MM-DD"
     function normalizeDate(dateStr) {
         if (!dateStr) return new Date().toISOString().split('T')[0];
-        // Ejemplo: "Jul 12th, 2025"
+        // Si ya está en formato YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+        // Si es tipo "Jul 12th, 2025"
         const match = dateStr.match(/([A-Za-z]+) (\d+)[a-z]{0,2}, (\d{4})/);
         if (match) {
             const monthStr = match[1];
@@ -587,37 +589,31 @@ async function fetchFBStreamsMotorsportsEvents(html) {
                 Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
                 Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
             };
-            const month = months[monthStr.slice(0,3)] || '01';
-            return `${year}-${month}-${day}`;
+            return `${year}-${months[monthStr] || '01'}-${day}`;
         }
-        return new Date().toISOString().split('T')[0];
+        return dateStr;
     }
-    // Recorrer todos los hijos de #v8t6d2j7i9
-    $('#v8t6d2j7i9').children().each((i, el) => {
-        const $el = $(el);
-        // Detectar cambio de fecha (div con btn-info)
-        if ($el.hasClass('btn-info')) {
-            const dateText = $el.text().trim();
-            currentDate = normalizeDate(dateText);
-        }
-        // Detectar evento (a.btn.btn-dark)
-        if ($el.is('a.btn.btn-dark')) {
-            let title = $el.attr('title') || $el.text();
-            title = title.replace(/\s+/g, ' ').replace(/\n/g, '').trim();
-            let link = $el.attr('href');
-            if (link && !/^http/.test(link)) link = 'https://fbstreams.pm' + link;
-            let time = '';
-            let date = currentDate;
-            const $timeSpan = $el.find('.s2m7s8x4e4').first();
-            if ($timeSpan.length) {
-                time = $timeSpan.text().trim();
-                let dateAttr = $timeSpan.attr('data-d5i7a1e9h5');
-                if (dateAttr) {
-                    dateAttr = dateAttr.replace(/['\"]/g, '');
-                    date = dateAttr;
-                }
+    // Selecciona el contenedor principal de eventos
+    const container = $('#v8t6d2j7i9');
+    let day = null;
+    container.children().each((i, el) => {
+        const elem = $(el);
+        if (elem.hasClass('btn-info')) {
+            // Día nuevo
+            day = elem.text().trim();
+            day = normalizeDate(day);
+        } else if (elem.is('a.btn.btn-dark')) {
+            // Evento
+            if (!day) return; // Ignora eventos sin día
+            const timeSpan = elem.find('span.s2m7s8x4e4');
+            const time = timeSpan.length ? timeSpan.text().trim() : '';
+            const title = elem.attr('title') ? elem.attr('title').trim() : elem.text().replace(/\s+/g, ' ').trim();
+            const link = elem.attr('href');
+            // El día puede estar en el atributo data-d5i7a1e9h5 del span, si existe
+            let eventDay = day;
+            if (timeSpan.length && timeSpan.attr('data-d5i7a1e9h5')) {
+                eventDay = normalizeDate(timeSpan.attr('data-d5i7a1e9h5'));
             }
-            if (!date) date = new Date().toISOString().split('T')[0];
             events.push({
                 time,
                 title,
@@ -625,8 +621,8 @@ async function fetchFBStreamsMotorsportsEvents(html) {
                 buttons: [button],
                 category,
                 language,
-                date,
-                eventDay: date,
+                date: eventDay,
+                eventDay,
                 source,
                 image
             });
