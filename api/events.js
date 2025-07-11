@@ -421,7 +421,16 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     if (cardName === 'Formula E') {
                         showDate = 'Formula E';
                     }
-                    title = `${baseTitle} - ${cardName} - ${showDate}`.replace(/\s+-\s+-\s+/g, ' - ').replace(/\s+-\s+$/, '');
+                    // Evitar repeticiones en el título (por ejemplo: Formula E - Formula E)
+                    let titleParts = [baseTitle, cardName, showDate].filter(Boolean);
+                    // Eliminar repeticiones consecutivas
+                    let filteredTitleParts = [];
+                    for (let i = 0; i < titleParts.length; i++) {
+                        if (i === 0 || titleParts[i].toLowerCase() !== titleParts[i - 1].toLowerCase()) {
+                            filteredTitleParts.push(titleParts[i]);
+                        }
+                    }
+                    title = filteredTitleParts.join(' - ');
                 }
                 // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
                 let date = eventDate || new Date().toISOString().split('T')[0];
