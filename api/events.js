@@ -563,6 +563,7 @@ async function fetchWeAreCheckingFootballEvents() {
 /**
  * Scrapea eventos de https://fbstreams.pm/stream/motorsports y extrae el link de transmisión de cada evento
  * Recorre los hijos de #v8o8c3o7w9 en orden, asocia la fecha correcta y extrae hora, título y link correctamente.
+ * Mejorado: debug y limpieza de título.
  */
 async function fetchFBStreamsMotorsportsEvents() {
     try {
@@ -580,23 +581,33 @@ async function fetchFBStreamsMotorsportsEvents() {
         const events = [];
         const eventPromises = [];
         let currentDate = null;
-        // Recorrer hijos de #v8o8c3o7w9 en orden
+        let eventCount = 0;
         $('#v8o8c3o7w9').children().each((i, el) => {
             const $el = $(el);
             // Si es separador de fecha
             if ($el.hasClass('w6x2l5g8n0')) {
                 currentDate = $el.text().trim();
+                console.log('[FBStreams] Nueva fecha encontrada:', currentDate);
                 return;
             }
             // Si es un evento
             if ($el.is('a.btn-dark')) {
                 let link = $el.attr('href') || '';
                 if (link && !link.startsWith('http')) link = 'https://fbstreams.pm' + link;
-                let title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
                 // Extraer hora del <span> si existe
                 let time = $el.find('span.y4v8r4p5o5').text().trim();
                 if (!time) time = '00:00';
-                // Eliminar la hora del título si está incluida
+                // Limpiar título: quitar el span de la hora del texto
+                let title = '';
+                if ($el.find('span.y4v8r4p5o5').length > 0) {
+                    // Quitar el span del html y obtener el texto limpio
+                    const $clone = $el.clone();
+                    $clone.find('span.y4v8r4p5o5').remove();
+                    title = $clone.text().replace(/\s+/g, ' ').trim();
+                } else {
+                    title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
+                }
+                // Eliminar la hora del título si quedó
                 if (time && title.includes(time)) {
                     title = title.replace(time, '').trim();
                 }
@@ -618,6 +629,7 @@ async function fetchFBStreamsMotorsportsEvents() {
                             let iframeSrc = $sub('div.ratio iframe').attr('src') || '';
                             if (iframeSrc && iframeSrc.startsWith('/')) iframeSrc = 'https://fbstreams.pm' + iframeSrc;
                             if (iframeSrc) {
+                                eventCount++;
                                 events.push({
                                     time,
                                     title: title || 'Evento FBStreams',
@@ -630,9 +642,12 @@ async function fetchFBStreamsMotorsportsEvents() {
                                     image: 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
                                     options: [{ name: 'FBSTREAMS', link: iframeSrc }]
                                 });
+                                console.log(`[FBStreams] Evento agregado: ${date} ${time} ${title}`);
+                            } else {
+                                console.log(`[FBStreams] No se encontró iframe en ${link}`);
                             }
                         } catch (e) {
-                            // Ignorar errores individuales
+                            console.log('[FBStreams] Error al fetch de evento:', link, e.message);
                         }
                     })();
                     eventPromises.push(p);
@@ -640,7 +655,7 @@ async function fetchFBStreamsMotorsportsEvents() {
             }
         });
         await Promise.all(eventPromises);
-        console.log(`FBStreams Motorsports: ${events.length} eventos obtenidos`);
+        console.log(`FBStreams Motorsports: ${eventCount} eventos obtenidos`);
         return events;
     } catch (error) {
         console.error('Error al obtener eventos de FBStreams Motorsports:', error);
