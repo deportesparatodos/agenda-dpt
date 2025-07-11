@@ -415,13 +415,19 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     }
                     // El título base es el texto después del span
                     let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
-                    // Formatear el título como: TITULO - CATEGORIA - FECHA
-                    // Si la categoría es Formula E, reemplazar eventDate por 'Formula E' en el título
-                    let showDate = eventDate;
+                    // Extraer solo el día (número) de eventDate si existe
+                    let dayOnly = '';
+                    if (eventDate) {
+                        const dayMatch = eventDate.match(/^(\d{1,2})/);
+                        if (dayMatch) {
+                            dayOnly = dayMatch[1];
+                        }
+                    }
+                    // Formatear el título como: TITULO - CATEGORIA - DÍA
+                    let showDate = dayOnly;
                     if (cardName === 'Formula E') {
                         showDate = 'Formula E';
                     }
-                    // Evitar repeticiones en el título (por ejemplo: Formula E - Formula E)
                     let titleParts = [baseTitle, cardName, showDate].filter(Boolean);
                     // Eliminar repeticiones consecutivas
                     let filteredTitleParts = [];
