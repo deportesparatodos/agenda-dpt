@@ -582,7 +582,8 @@ export default async (req, res) => {
             if (event.title && event.title.toUpperCase().includes('MLB')) {
                 event.image = `https://${alanGuloConfig.linkDomain}/mlb`;
             }
-            if (event.time) {
+            // Solo ajustar la hora si event.time es solo HH:MM
+            if (event.time && /^\d{1,2}:\d{2}$/.test(event.time.trim())) {
                 const timeParts = event.time.split(':');
                 if (timeParts.length >= 2) {
                     let hour = parseInt(timeParts[0]);
