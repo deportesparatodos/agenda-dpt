@@ -602,25 +602,22 @@ async function fetchFBStreamsMotorsportsEvents(html) {
         }
         // Detectar evento (a.btn.btn-dark)
         if ($el.is('a.btn.btn-dark')) {
-            const title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
+            let title = $el.attr('title') || $el.text();
+            title = title.replace(/\s+/g, ' ').replace(/\n/g, '').trim();
             let link = $el.attr('href');
             if (link && !/^http/.test(link)) link = 'https://fbstreams.pm' + link;
-            // Buscar hora y fecha dentro del a
             let time = '';
             let date = currentDate;
             const $timeSpan = $el.find('.s2m7s8x4e4').first();
             if ($timeSpan.length) {
                 time = $timeSpan.text().trim();
-                // El atributo data-d5i7a1e9h5 puede tener la fecha
                 let dateAttr = $timeSpan.attr('data-d5i7a1e9h5');
                 if (dateAttr) {
-                    // Puede venir como '"2025-07-12"', quitar comillas
                     dateAttr = dateAttr.replace(/['\"]/g, '');
                     date = dateAttr;
                 }
             }
             if (!date) date = new Date().toISOString().split('T')[0];
-            if (!time) time = '';
             events.push({
                 time,
                 title,
