@@ -393,37 +393,16 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 let eventDate = '';
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
+                let spanText = '';
                 if ($span.length) {
-                    // Ejemplo: "11 jul, 02:40 a.m. ￨ "
-                    let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
-                    // Separar fecha y hora
-                    const fechaHoraMatch = spanText.match(/^(\d{1,2} \w{3}), (\d{2}):(\d{2}) ([ap])\.m\./i);
-                    if (fechaHoraMatch) {
-                        eventDate = fechaHoraMatch[1]; // "11 jul"
-                        let hour = parseInt(fechaHoraMatch[2], 10);
-                        const minute = fechaHoraMatch[3];
-                        const ampm = fechaHoraMatch[4].toLowerCase();
-                        if (ampm === 'p' && hour !== 12) hour += 12;
-                        if (ampm === 'a' && hour === 12) hour = 0;
-                        time = `${String(hour).padStart(2, '0')}:${minute}`;
-                    } else {
-                        // Si no matchea, usar todo el span como hora
-                        time = spanText;
-                        // Intentar extraer solo la fecha si es posible
-                        const soloFecha = spanText.match(/^(\d{1,2} \w{3})/i);
-                        if (soloFecha) eventDate = soloFecha[1];
-                    }
+                    // Tomar el texto tal cual del span (ej: "11 jul, 16:30")
+                    spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                    eventDate = spanText;
+                    time = spanText;
                     // El título base es el texto después del span
                     let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
-                    // Eliminar cualquier referencia a fecha en el título
-                    let showDate = '';
-                    if (cardName === 'fe') {
-                        showDate = 'Formula E';
-                    }
-                    // --- NUEVO: Formato de título solicitado ---
-                    // Si hay eventDate y time, formatear como "baseTitle - cardName - 11 Jul, 16:30"
-                    let dateTimeStr = eventDate ? `${eventDate.charAt(0).toUpperCase() + eventDate.slice(1)}, ${time}` : time;
-                    title = `${baseTitle} - ${cardName} - ${dateTimeStr}`;
+                    // Formato de título solicitado
+                    title = `${baseTitle} - ${cardName} - ${spanText}`;
                 }
                 // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
                 let date = '';
