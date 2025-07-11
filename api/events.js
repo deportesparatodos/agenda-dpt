@@ -563,7 +563,7 @@ async function fetchWeAreCheckingFootballEvents() {
 /**
  * Scrapea eventos de https://fbstreams.pm/stream/motorsports y extrae el link de transmisión de cada evento
  * Recorre los hijos de #v8o8c3o7w9 en orden, asocia la fecha correcta y extrae hora, título y link correctamente.
- * Mejorado: debug y limpieza de título.
+ * Debug: imprime los hijos del contenedor para ver si Cheerio los detecta.
  */
 async function fetchFBStreamsMotorsportsEvents() {
     try {
@@ -582,6 +582,15 @@ async function fetchFBStreamsMotorsportsEvents() {
         const eventPromises = [];
         let currentDate = null;
         let eventCount = 0;
+        // DEBUG: imprimir los hijos del contenedor
+        const hijos = $('#v8o8c3o7w9').children();
+        console.log('[FBStreams] Total hijos en #v8o8c3o7w9:', hijos.length);
+        hijos.each((i, el) => {
+            const tag = el.tagName;
+            const classes = (el.attribs && el.attribs.class) ? el.attribs.class : '';
+            const text = $(el).text().trim().slice(0, 80);
+            console.log(`[FBStreams] Hijo #${i}: <${tag} class="${classes}"> texto: ${text}`);
+        });
         $('#v8o8c3o7w9').children().each((i, el) => {
             const $el = $(el);
             // Si es separador de fecha
