@@ -415,15 +415,16 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     }
                     // El título base es el texto después del span
                     let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
-                    // Extraer solo el día (número) de eventDate si existe
+                    // Extraer solo el día (número) de eventDate si existe, y agregar el mes actual
                     let dayOnly = '';
+                    let currentMonth = new Date().toLocaleString('es-ES', { month: 'short' });
                     if (eventDate) {
                         const dayMatch = eventDate.match(/^(\d{1,2})/);
                         if (dayMatch) {
-                            dayOnly = dayMatch[1];
+                            dayOnly = `${dayMatch[1]} ${currentMonth}`;
                         }
                     }
-                    // Formatear el título como: TITULO - CATEGORIA - DÍA
+                    // Formatear el título como: TITULO - CATEGORIA - DÍA MES
                     let showDate = dayOnly;
                     if (cardName === 'Formula E') {
                         showDate = 'Formula E';
