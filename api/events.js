@@ -415,14 +415,12 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     }
                     // El título base es el texto después del span
                     let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
-                    // Extraer solo el día (número) de eventDate si existe, y agregar el mes actual
+                    // Extraer el día directamente del spanText (no de eventDate)
                     let dayOnly = '';
                     let currentMonth = new Date().toLocaleString('es-ES', { month: 'short' });
-                    if (eventDate) {
-                        const dayMatch = eventDate.match(/^(\d{1,2})/);
-                        if (dayMatch) {
-                            dayOnly = `${dayMatch[1]} ${currentMonth}`;
-                        }
+                    let spanDayMatch = spanText.match(/^(\d{1,2})/);
+                    if (spanDayMatch) {
+                        dayOnly = `${spanDayMatch[1]} ${currentMonth}`;
                     }
                     // Formatear el título como: TITULO - CATEGORIA - DÍA MES
                     let showDate = dayOnly;
