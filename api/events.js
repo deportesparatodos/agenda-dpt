@@ -397,19 +397,19 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                         const soloFecha = spanText.match(/^(\d{1,2} \w{3})/i);
                         if (soloFecha) eventDate = soloFecha[1];
                     }
-                    // Extraer el título base (sin el span)
-                    let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
-                    // Extraer el nombre de la "card" desde la clase del wrapper
+                    // Extraer nombre de la card/categoría desde la clase del wrapper
                     let cardName = '';
                     const wrapperClass = $wrapper.attr('class') || '';
-                    const cardMatch = wrapperClass.match(/wrapper-([\w\d-]+)/i);
+                    const cardMatch = wrapperClass.match(/wrapper-([\w\d]+)/i);
                     if (cardMatch) {
                         cardName = cardMatch[1];
                     } else {
-                        cardName = category || 'motorsports';
+                        cardName = category || '';
                     }
-                    // Formatear el título como "TITULO - CATEGORIA - FECHA"
-                    title = `${baseTitle} - ${cardName} - ${eventDate}`.replace(/\s+-\s+/g, ' - ').trim();
+                    // El título base es el texto después del span
+                    let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
+                    // Formatear el título como: TITULO - CATEGORIA - FECHA
+                    title = `${baseTitle} - ${cardName} - ${eventDate}`.replace(/\s+-\s+-\s+/g, ' - ').replace(/\s+-\s+$/, '');
                 }
                 // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
                 let date = eventDate || new Date().toISOString().split('T')[0];
