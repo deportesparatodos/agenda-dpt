@@ -406,10 +406,22 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     } else {
                         cardName = category || '';
                     }
+                    // Normalizar nombres especiales
+                    if (cardName.toLowerCase() === 'fe') {
+                        cardName = 'Formula E';
+                    }
+                    if (cardName.toLowerCase() === 'superv8') {
+                        cardName = 'SUPERCARS';
+                    }
                     // El título base es el texto después del span
                     let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                     // Formatear el título como: TITULO - CATEGORIA - FECHA
-                    title = `${baseTitle} - ${cardName} - ${eventDate}`.replace(/\s+-\s+-\s+/g, ' - ').replace(/\s+-\s+$/, '');
+                    // Si la categoría es Formula E, reemplazar eventDate por 'Formula E' en el título
+                    let showDate = eventDate;
+                    if (cardName === 'Formula E') {
+                        showDate = 'Formula E';
+                    }
+                    title = `${baseTitle} - ${cardName} - ${showDate}`.replace(/\s+-\s+-\s+/g, ' - ').replace(/\s+-\s+$/, '');
                 }
                 // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
                 let date = eventDate || new Date().toISOString().split('T')[0];
