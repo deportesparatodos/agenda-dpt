@@ -562,6 +562,7 @@ async function fetchWeAreCheckingFootballEvents() {
 // --- FBStreams Motorsports ---
 /**
  * Scrapea eventos de https://fbstreams.pm/stream/motorsports y extrae el link de transmisión de cada evento
+ * Corrige el selector para los <a> de eventos y extrae hora, título y link correctamente.
  */
 async function fetchFBStreamsMotorsportsEvents() {
     try {
@@ -578,21 +579,19 @@ async function fetchFBStreamsMotorsportsEvents() {
         const $ = cheerio.load(html);
         const events = [];
         const eventPromises = [];
-        // Cada evento está en un .card o similar (ajustar si cambia el selector)
-        $('.card, .event-card, .list-group-item').each((i, el) => {
+        // Seleccionar todos los <a> de evento
+        $('a.btn-dark').each((i, el) => {
             const $el = $(el);
-            // Título del evento
-            let title = $el.find('.card-title, .event-title, .list-group-item-heading').text().trim();
-            if (!title) title = $el.find('a').first().text().trim();
-            // Link al evento
-            let link = $el.find('a').attr('href') || '';
+            let link = $el.attr('href') || '';
             if (link && !link.startsWith('http')) link = 'https://fbstreams.pm' + link;
-            // Hora (si existe)
-            let time = $el.find('.event-time, .badge, .list-group-item-text').first().text().trim();
+            let title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
+            // Extraer hora del <span> si existe
+            let time = $el.find('span.y4v8r4p5o5').text().trim();
             if (!time) time = '00:00';
-            // Imagen (si existe)
-            let image = $el.find('img').attr('src') || '';
-            if (image && image.startsWith('/')) image = 'https://fbstreams.pm' + image;
+            // Eliminar la hora del título si está incluida
+            if (time && title.includes(time)) {
+                title = title.replace(time, '').trim();
+            }
             // Promesa: entrar al link del evento y extraer el src del iframe
             if (link) {
                 const p = (async () => {
@@ -619,7 +618,7 @@ async function fetchFBStreamsMotorsportsEvents() {
                                 language: 'Inglés',
                                 date: new Date().toISOString().split('T')[0],
                                 source: 'fbstreams-motorsports',
-                                image: image || 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
+                                image: 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
                                 options: [{ name: 'FBSTREAMS', link: iframeSrc }]
                             });
                         }
