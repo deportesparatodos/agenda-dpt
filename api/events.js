@@ -397,12 +397,23 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                         const soloFecha = spanText.match(/^(\d{1,2} \w{3})/i);
                         if (soloFecha) eventDate = soloFecha[1];
                     }
+                    // Título base
                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                 }
                 // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
                 let date = eventDate || new Date().toISOString().split('T')[0];
                 // Imagen FIJA para todos los eventos de motorsports
                 image = 'https://images.vexels.com/media/users/3/139434/isolated/preview/4bcbe9b4d3e6f6e4c1207c142a98c2d8-carrera-de-coches-de-carreras-de-ferrari.png';
+                // Añadir el nombre de la card (wrapper) y la fecha textual exacta al título
+                let cardName = category.toLowerCase();
+                // Extraer la fecha textual exacta del span (por ejemplo: "11 jul")
+                let fechaTxt = '';
+                if ($span.length) {
+                    let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                    const fechaTxtMatch = spanText.match(/^(\d{1,2} \w{3})/i);
+                    if (fechaTxtMatch) fechaTxt = fechaTxtMatch[1];
+                }
+                title = `${title} - ${cardName} - ${fechaTxt}`;
                 const eventObj = {
                     time,
                     title,
