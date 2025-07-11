@@ -362,7 +362,16 @@ async function fetchWeAreCheckingMotorsportsEvents() {
             } else if (image && image.startsWith('/')) {
                 image = 'https://wearechecking.online' + image;
             }
-            // Nombre de la categoría
+            // Nombre de la categoría/card (ej: indycar)
+            let cardName = '';
+            const wrapperClass = $wrapper.attr('class') || '';
+            const cardMatch = wrapperClass.match(/wrapper-([\w\d]+)/i);
+            if (cardMatch) {
+                cardName = cardMatch[1];
+            } else {
+                cardName = '';
+            }
+            // Nombre legible de la categoría (ej: Indycar)
             let category = $wrapper.find('.series-title img').attr('alt') || '';
             if (category) {
                 category = category.replace(/^(series-title-)?/i, '').replace(/\.svg$/i, '').replace(/[-_]/g, ' ').trim();
@@ -404,38 +413,17 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                         const soloFecha = spanText.match(/^(\d{1,2} \w{3})/i);
                         if (soloFecha) eventDate = soloFecha[1];
                     }
-                    // Extraer nombre de la card/categoría desde la clase del wrapper
-                    let cardName = '';
-                    const wrapperClass = $wrapper.attr('class') || '';
-                    const cardMatch = wrapperClass.match(/wrapper-([\w\d]+)/i);
-                    if (cardMatch) {
-                        cardName = cardMatch[1];
-                    } else {
-                        cardName = category || '';
-                    }
-                    // Normalizar nombres especiales
-                    if (cardName.toLowerCase() === 'fe') {
-                        cardName = 'Formula E';
-                    }
-                    if (cardName.toLowerCase() === 'superv8') {
-                        cardName = 'SUPERCARS';
-                    }
                     // El título base es el texto después del span
                     let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                     // Eliminar cualquier referencia a fecha en el título
                     let showDate = '';
-                    if (cardName === 'Formula E') {
+                    if (cardName === 'fe') {
                         showDate = 'Formula E';
                     }
-                    let titleParts = [baseTitle, cardName, showDate].filter(Boolean);
-                    // Eliminar repeticiones consecutivas
-                    let filteredTitleParts = [];
-                    for (let i = 0; i < titleParts.length; i++) {
-                        if (i === 0 || titleParts[i].toLowerCase() !== titleParts[i - 1].toLowerCase()) {
-                            filteredTitleParts.push(titleParts[i]);
-                        }
-                    }
-                    title = filteredTitleParts.join(' - ');
+                    // --- NUEVO: Formato de título solicitado ---
+                    // Si hay eventDate y time, formatear como "baseTitle - cardName - 11 Jul, 16:30"
+                    let dateTimeStr = eventDate ? `${eventDate.charAt(0).toUpperCase() + eventDate.slice(1)}, ${time}` : time;
+                    title = `${baseTitle} - ${cardName} - ${dateTimeStr}`;
                 }
                 // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
                 let date = '';
