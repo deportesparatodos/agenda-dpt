@@ -576,29 +576,39 @@ async function fetchViprowMotorsportsEvents() {
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
-        // Cada evento está en .sports > ul > li
-        $('.sports > ul > li').each((i, el) => {
-            const $li = $(el);
-            // Título del evento
-            const title = $li.find('.event').text().trim();
-            // Link al evento (a la página de stream)
-            const link = $li.find('a').attr('href');
-            // Hora (si está disponible)
-            let time = $li.find('.time').text().trim();
-            if (!time) time = '00:00';
-            // Categoría (si está disponible)
-            let category = $li.find('.category').text().trim();
-            if (!category) category = 'Motorsports';
+        // Buscar todos los <a> que sean eventos motorsports
+        $("a.btn.btn-primary").each((i, el) => {
+            const $a = $(el);
+            const href = $a.attr('href');
+            const title = $a.attr('title') || $a.text().replace(/\s+/g, ' ').trim();
+            // Buscar hora si existe en un <span> dentro del <a>
+            let time = '';
+            const $span = $a.find('span.u2b0g6x9c1');
+            if ($span.length) {
+                time = $span.text().trim();
+            } else {
+                // Si no hay span, intentar extraer hora del texto (opcional)
+                time = '';
+            }
+            // Eliminar la hora del título si está duplicada
+            let cleanTitle = title;
+            if (time && cleanTitle.includes(time)) {
+                cleanTitle = cleanTitle.replace(time, '').trim();
+            }
+            // Si el título empieza con un número (hora), quitarlo
+            cleanTitle = cleanTitle.replace(/^\d{1,2}:\d{2}\s*/, '');
             // Imagen específica SOLO para VIPRow
             const image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
             // Fecha (vacía, VIPRow no la da)
             const date = '';
+            // Categoría
+            let category = 'Motorsports';
             // Estructura igual a otros eventos
-            if (title && link) {
+            if (href && cleanTitle) {
                 events.push({
-                    time,
-                    title,
-                    link: link.startsWith('http') ? link : `https://www.viprow.nu${link}`,
+                    time: time || '00:00',
+                    title: cleanTitle,
+                    link: href.startsWith('http') ? href : `https://www.viprow.nu${href}`,
                     button: 'VIPROW',
                     category,
                     language: 'Inglés',
@@ -606,7 +616,7 @@ async function fetchViprowMotorsportsEvents() {
                     eventDate: '',
                     source: 'viprow-motorsports',
                     image,
-                    options: [] // Por ahora vacío, scraping de iframes pendiente
+                    options: []
                 });
             }
         });
