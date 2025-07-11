@@ -740,9 +740,9 @@ export default async (req, res) => {
                     const match = event.link.match(/[?&]stream=([^&#]+)/i);
                     buttonArr = [match ? match[1].toUpperCase() : 'CANAL'];
                     optionsArr = [event.link];
-                } else if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports') && Array.isArray(event.options) && event.options.length > 0) {
-                    buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
-                    optionsArr = event.options.map(opt => opt.link);
+                } else if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports' || event.source === 'fbstreams') && Array.isArray(event.options) && event.options.length > 0) {
+                    buttonArr = event.buttons || event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
+                    optionsArr = event.options;
                 } else if (event.button) {
                     buttonArr = [event.button];
                     optionsArr = [event.link];
