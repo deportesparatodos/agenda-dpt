@@ -559,78 +559,6 @@ async function fetchWeAreCheckingFootballEvents() {
     }
 }
 
-/**
- * Scrapea eventos de https://fbstreams.pm/stream/motorsports
- * Usa el HTML proporcionado (no hace fetch real, sino que espera el HTML como string)
- * Todos los eventos llevan la imagen de race car indicada
- */
-async function fetchFBStreamsMotorsportsEvents(html) {
-    const cheerio = require('cheerio');
-    const $ = cheerio.load(html);
-    const events = [];
-    const image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
-    const source = 'fbstreams';
-    const button = 'FBSTREAM';
-    const category = 'Motorsports';
-    const language = 'Inglés';
-    let currentDate = null;
-    // Normaliza fechas tipo "2025-07-12" a "YYYY-MM-DD"
-    function normalizeDate(dateStr) {
-        if (!dateStr) return new Date().toISOString().split('T')[0];
-        // Si ya está en formato YYYY-MM-DD
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-        // Si es tipo "Jul 12th, 2025"
-        const match = dateStr.match(/([A-Za-z]+) (\d+)[a-z]{0,2}, (\d{4})/);
-        if (match) {
-            const monthStr = match[1];
-            const day = match[2].padStart(2, '0');
-            const year = match[3];
-            const months = {
-                Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
-                Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
-            };
-            return `${year}-${months[monthStr] || '01'}-${day}`;
-        }
-        return dateStr;
-    }
-    // Selecciona el contenedor principal de eventos
-    const container = $('#v8t6d2j7i9');
-    let day = null;
-    container.children().each((i, el) => {
-        const elem = $(el);
-        if (elem.hasClass('btn-info')) {
-            // Día nuevo
-            day = elem.text().trim();
-            day = normalizeDate(day);
-        } else if (elem.is('a.btn.btn-dark')) {
-            // Evento
-            if (!day) return; // Ignora eventos sin día
-            const timeSpan = elem.find('span.s2m7s8x4e4');
-            const time = timeSpan.length ? timeSpan.text().trim() : '';
-            const title = elem.attr('title') ? elem.attr('title').trim() : elem.text().replace(/\s+/g, ' ').trim();
-            const link = elem.attr('href');
-            // El día puede estar en el atributo data-d5i7a1e9h5 del span, si existe
-            let eventDay = day;
-            if (timeSpan.length && timeSpan.attr('data-d5i7a1e9h5')) {
-                eventDay = normalizeDate(timeSpan.attr('data-d5i7a1e9h5'));
-            }
-            events.push({
-                time,
-                title,
-                options: [link],
-                buttons: [button],
-                category,
-                language,
-                date: eventDay,
-                eventDay,
-                source,
-                image
-            });
-        }
-    });
-    return events;
-}
-
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -652,18 +580,12 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, fbstreamsMotorsportsHtml] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingEvents(),
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchWeAreCheckingFootballEvents(),
-            fetch('https://fbstreams.pm/stream/motorsports', {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                },
-                timeout: 15000
-            })
+            fetchWeAreCheckingFootballEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
@@ -671,26 +593,14 @@ export default async (req, res) => {
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const wearecheckingFootballEvents = wacFootballEvents.status === 'fulfilled' ? wacFootballEvents.value : [];
-        let fbstreamsMotorsportsEvents = [];
-        if (fbstreamsMotorsportsHtml.status === 'fulfilled' && fbstreamsMotorsportsHtml.value.ok) {
-            const html = await fbstreamsMotorsportsHtml.value.text();
-            try {
-                fbstreamsMotorsportsEvents = await fetchFBStreamsMotorsportsEvents(html);
-            } catch (e) {
-                console.error('Error procesando eventos de FBStreams Motorsports:', e);
-            }
-        } else {
-            if (fbstreamsMotorsportsHtml.status === 'rejected') console.error('FBStreams Motorsports falló:', fbstreamsMotorsportsHtml.reason);
-        }
+        
+        if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
+        if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
+        if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
+        if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
+        if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
 
-        const allEvents = [
-            ...streamEvents,
-            ...alanEvents,
-            ...wearecheckingEvents,
-            ...wearecheckingMotorsportsEvents,
-            ...wearecheckingFootballEvents,
-            ...fbstreamsMotorsportsEvents
-        ];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
@@ -736,9 +646,9 @@ export default async (req, res) => {
                     const match = event.link.match(/[?&]stream=([^&#]+)/i);
                     buttonArr = [match ? match[1].toUpperCase() : 'CANAL'];
                     optionsArr = [event.link];
-                } else if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports' || event.source === 'fbstreams') && Array.isArray(event.options) && event.options.length > 0) {
-                    buttonArr = event.buttons || event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
-                    optionsArr = event.options;
+                } else if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports') && Array.isArray(event.options) && event.options.length > 0) {
+                    buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
+                    optionsArr = event.options.map(opt => opt.link);
                 } else if (event.button) {
                     buttonArr = [event.button];
                     optionsArr = [event.link];
