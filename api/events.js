@@ -100,9 +100,13 @@ async function fetchStreamTpGlobalEvents() {
 
 /**
  * Función para hacer scraping de alangulotv usando Cheerio
+ * ACTUALIZADA JULIO 2025: scrapea https://alangulotv.me/agenda-2/ y para cada botón entra a su link,
+ * extrae el objeto channels y busca la key correspondiente para obtener el link real.
  */
-async function fetchAlanGuloTVEvents(config, canales) {
-    const { agendaUrl, linkDomain } = config;
+async function fetchAlanGuloTVEvents(config) {
+    // Usar la nueva URL fija
+    const agendaUrl = 'https://alangulotv.me/agenda-2/';
+    const linkDomain = 'p.alangulotv.space';
     try {
         console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
         const response = await fetch(agendaUrl, {
@@ -117,10 +121,10 @@ async function fetchAlanGuloTVEvents(config, canales) {
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
+        const eventPromises = [];
         $('.match-container').each((index, element) => {
             try {
                 const $container = $(element);
-                // Prioriza la imagen del evento
                 let imageUrl = $container.find('img.event-logo').attr('src') || '';
                 if (!imageUrl) {
                     imageUrl = $container.find('img.team-logo').first().attr('src') || '';
@@ -141,55 +145,58 @@ async function fetchAlanGuloTVEvents(config, canales) {
                         const href = $link.attr('href');
                         const buttonName = $link.text().trim() || 'CANAL';
                         if (href) {
+                            // Construir URL absoluta si es relativa
+                            let eventPageUrl = href.startsWith('http') ? href : `https://alangulotv.me${href}`;
+                            // Extraer la key de canal de la URL
                             const pathParts = href.split('/').filter(part => part.length > 0);
                             const linkKey = pathParts[pathParts.length - 1];
-                            // Lógica normal
-                            if (linkKey && canales.canales && canales.canales[linkKey]) {
-                                const channelData = canales.canales[linkKey];
-                                const firstAvailableKey = Object.keys(channelData)[0];
-                                if (firstAvailableKey) {
-                                    const finalLink = channelData[firstAvailableKey];
-                                    if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
-                                        events.push({
-                                            time,
-                                            title,
-                                            link: finalLink,
-                                            button: buttonName,
-                                            category: 'Deportes',
-                                            language: 'Español',
-                                            date: new Date().toISOString().split('T')[0],
-                                            source: 'alangulotv',
-                                            image: imageUrl
-                                        });
-                                        return; // Si ya se encontró, no buscar más
+                            // Promesa: entrar a la página del botón, extraer channels y buscar la key
+                            const p = (async () => {
+                                try {
+                                    const subRes = await fetch(eventPageUrl, {
+                                        headers: {
+                                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                        },
+                                        timeout: 15000
+                                    });
+                                    if (!subRes.ok) return;
+                                    const subHtml = await subRes.text();
+                                    // Buscar el objeto channels en el <script>
+                                    const channelsMatch = subHtml.match(/const\s+channels\s*=\s*(\{[\s\S]*?\});/);
+                                    if (channelsMatch && channelsMatch[1]) {
+                                        let channelsObj;
+                                        try {
+                                            channelsObj = eval('(' + channelsMatch[1] + ')');
+                                        } catch (e) {
+                                            return;
+                                        }
+                                        // Buscar la key
+                                        if (channelsObj[linkKey]) {
+                                            const channelData = channelsObj[linkKey];
+                                            const firstAvailableKey = Object.keys(channelData)[0];
+                                            if (firstAvailableKey) {
+                                                const finalLink = channelData[firstAvailableKey];
+                                                if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
+                                                    events.push({
+                                                        time,
+                                                        title,
+                                                        link: finalLink,
+                                                        button: buttonName,
+                                                        category: 'Deportes',
+                                                        language: 'Español',
+                                                        date: new Date().toISOString().split('T')[0],
+                                                        source: 'alangulotv',
+                                                        image: imageUrl
+                                                    });
+                                                }
+                                            }
+                                        }
                                     }
+                                } catch (e) {
+                                    // Ignorar errores de fetch individuales
                                 }
-                            }
-                            // Lógica especial para transmi-1, transmi-2, ...
-                            const transmiMatch = linkKey.match(/^transmi-(\d+)$/);
-                            if (transmiMatch && canales.canales && canales.canales['espn']) {
-                                const channelData = canales.canales['espn'];
-                                const firstAvailableKey = Object.keys(channelData)[0];
-                                if (firstAvailableKey) {
-                                    let finalLink = channelData[firstAvailableKey];
-                                    if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
-                                        // Reemplazar la última parte del link por transmi1, transmi2, ...
-                                        finalLink = finalLink.replace(/([\w-]+)$/i, `transmi${transmiMatch[1]}`);
-                                        events.push({
-                                            time,
-                                            title,
-                                            link: finalLink,
-                                            button: buttonName,
-                                            category: 'Deportes',
-                                            language: 'Español',
-                                            date: new Date().toISOString().split('T')[0],
-                                            source: 'alangulotv',
-                                            image: imageUrl
-                                        });
-                                        return;
-                                    }
-                                }
-                            }
+                            })();
+                            eventPromises.push(p);
                         }
                     });
                 }
@@ -197,10 +204,9 @@ async function fetchAlanGuloTVEvents(config, canales) {
                 console.error('Error procesando evento AlanGuloTV:', error);
             }
         });
-        
+        await Promise.all(eventPromises);
         console.log(`AlanGuloTV: ${events.length} eventos obtenidos`);
         return events;
-        
     } catch (error) {
         console.error('Error al obtener eventos de AlanGuloTV:', error);
         return [];
