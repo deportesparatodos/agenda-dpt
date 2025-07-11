@@ -568,39 +568,59 @@ async function fetchFBStreamsMotorsportsEvents(html) {
     const cheerio = require('cheerio');
     const $ = cheerio.load(html);
     const events = [];
-    // Buscar los bloques de eventos dentro del contenedor con id 'v8t6d2j7i9'
     const image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
     const source = 'fbstreams';
     const button = 'FBSTREAM';
     const category = 'Motorsports';
     const language = 'Inglés';
-    // Recorrer los días y eventos
     let currentDate = null;
+    // Función para normalizar fechas tipo "Jul 12th, 2025" a "2025-07-12"
+    function normalizeDate(dateStr) {
+        if (!dateStr) return new Date().toISOString().split('T')[0];
+        // Ejemplo: "Jul 12th, 2025"
+        const match = dateStr.match(/([A-Za-z]+) (\d+)[a-z]{0,2}, (\d{4})/);
+        if (match) {
+            const monthStr = match[1];
+            const day = match[2].padStart(2, '0');
+            const year = match[3];
+            const months = {
+                Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+                Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
+            };
+            const month = months[monthStr.slice(0,3)] || '01';
+            return `${year}-${month}-${day}`;
+        }
+        return new Date().toISOString().split('T')[0];
+    }
+    // Recorrer todos los hijos de #v8t6d2j7i9
     $('#v8t6d2j7i9').children().each((i, el) => {
         const $el = $(el);
-        // Detectar cambio de fecha
+        // Detectar cambio de fecha (div con btn-info)
         if ($el.hasClass('btn-info')) {
-            // Extraer la fecha (YYYY-MM-DD)
             const dateText = $el.text().trim();
-            const dateAttr = $el.find('[data-d5i7a1e9h5]').attr('data-d5i7a1e9h5');
-            currentDate = dateAttr || dateText;
+            currentDate = normalizeDate(dateText);
         }
-        // Detectar evento
+        // Detectar evento (a.btn.btn-dark)
         if ($el.is('a.btn.btn-dark')) {
-            // Título
             const title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
-            // Link
             let link = $el.attr('href');
             if (link && !/^http/.test(link)) link = 'https://fbstreams.pm' + link;
-            // Hora
-            let time = $el.find('.s2m7s8x4e4').first().text().trim();
-            // Fecha
-            let date = $el.find('.s2m7s8x4e4').attr('data-d5i7a1e9h5') || currentDate;
-            // Si no hay hora, dejar en blanco
-            if (!time) time = '';
-            // Si no hay fecha, usar la actual
+            // Buscar hora y fecha dentro del a
+            let time = '';
+            let date = currentDate;
+            const $timeSpan = $el.find('.s2m7s8x4e4').first();
+            if ($timeSpan.length) {
+                time = $timeSpan.text().trim();
+                // El atributo data-d5i7a1e9h5 puede tener la fecha
+                let dateAttr = $timeSpan.attr('data-d5i7a1e9h5');
+                if (dateAttr) {
+                    // Puede venir como '"2025-07-12"', quitar comillas
+                    dateAttr = dateAttr.replace(/['\"]/g, '');
+                    date = dateAttr;
+                }
+            }
             if (!date) date = new Date().toISOString().split('T')[0];
-            // Adaptar a la estructura de la API
+            if (!time) time = '';
             events.push({
                 time,
                 title,
