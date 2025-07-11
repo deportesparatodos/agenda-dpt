@@ -576,7 +576,7 @@ async function fetchViprowMotorsportsEvents() {
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
-        // Buscar todos los <a> que sean eventos motorsports SOLO dentro del div principal
+        const eventPromises = [];
         $("#z4d3u2n5o3 a.btn.btn-primary").each((i, el) => {
             const $a = $(el);
             const href = $a.attr('href');
@@ -600,22 +600,61 @@ async function fetchViprowMotorsportsEvents() {
             const date = '';
             let category = 'Motorsports';
             if (href && cleanTitle) {
-                events.push({
-                    time: time || '00:00',
-                    title: cleanTitle,
-                    link: href.startsWith('http') ? href : `https://www.viprow.nu${href}`,
-                    button: 'VIPROW',
-                    category,
-                    language: 'Inglés',
-                    date,
-                    eventDate: '',
-                    source: 'viprow-motorsports',
-                    image,
-                    options: []
-                });
+                // Promesa: entrar al link y extraer el src del iframe
+                const eventUrl = href.startsWith('http') ? href : `https://www.viprow.nu${href}`;
+                const p = (async () => {
+                    let options = [];
+                    try {
+                        const subRes = await fetch(eventUrl, {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            },
+                            timeout: 15000
+                        });
+                        if (subRes.ok) {
+                            const subHtml = await subRes.text();
+                            const _$ = cheerio.load(subHtml);
+                            // Buscar el primer iframe dentro de .ratio-16x9 o directamente en el body
+                            let iframeSrc = '';
+                            const $iframe = _$(".ratio-16x9 iframe").first();
+                            if ($iframe.length) {
+                                iframeSrc = $iframe.attr('src') || '';
+                            } else {
+                                // fallback: buscar cualquier iframe
+                                const $iframe2 = _$("iframe").first();
+                                if ($iframe2.length) iframeSrc = $iframe2.attr('src') || '';
+                            }
+                            if (iframeSrc) {
+                                options.push(iframeSrc);
+                            }
+                        }
+                    } catch (e) {
+                        // Si falla, options vacío
+                    }
+                    // Solo devolver si hay al menos un link válido
+                    if (options.length > 0) {
+                        return {
+                            time: time || '00:00',
+                            title: cleanTitle,
+                            options: options, // array de strings
+                            buttons: ['VIPROW'],
+                            category,
+                            language: 'Inglés',
+                            date,
+                            eventDate: '',
+                            source: 'viprow-motorsports',
+                            image
+                        };
+                    } else {
+                        return null;
+                    }
+                })();
+                eventPromises.push(p);
             }
         });
-        return events;
+        const results = await Promise.all(eventPromises);
+        // Filtrar solo los eventos válidos
+        return results.filter(ev => ev && Array.isArray(ev.options) && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de VIPRow Motorsports:', error);
         return [];
