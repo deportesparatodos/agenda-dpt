@@ -559,108 +559,6 @@ async function fetchWeAreCheckingFootballEvents() {
     }
 }
 
-/**
- * Scrapea eventos de motorsports desde https://www.viprow.nu/sports-motorsports-online
- */
-async function fetchViprowMotorsportsEvents() {
-    try {
-        const url = 'https://www.viprow.nu/sports-motorsports-online';
-        console.log('Fetching VIPRow Motorsports eventos desde', url);
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            timeout: 15000
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        const html = await response.text();
-        const $ = cheerio.load(html);
-        const events = [];
-        const eventPromises = [];
-        $("#z4d3u2n5o3 a.btn.btn-primary").each((i, el) => {
-            const $a = $(el);
-            const href = $a.attr('href');
-            const title = $a.attr('title') || $a.text().replace(/\s+/g, ' ').trim();
-            // Buscar hora si existe en un <span> dentro del <a>
-            let time = '';
-            const $span = $a.find('span.u2b0g6x9c1');
-            if ($span.length) {
-                time = $span.text().trim();
-            } else {
-                time = '';
-            }
-            // Eliminar la hora del título si está duplicada
-            let cleanTitle = title;
-            if (time && cleanTitle.includes(time)) {
-                cleanTitle = cleanTitle.replace(time, '').trim();
-            }
-            cleanTitle = cleanTitle.replace(/^[0-9]{1,2}:[0-9]{2}\s*/, '');
-            // Imagen específica SOLO para VIPRow
-            const image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
-            const date = '';
-            let category = 'Motorsports';
-            if (href && cleanTitle) {
-                // Promesa: entrar al link y extraer el src del iframe
-                const eventUrl = href.startsWith('http') ? href : `https://www.viprow.nu${href}`;
-                const p = (async () => {
-                    let options = [];
-                    try {
-                        const subRes = await fetch(eventUrl, {
-                            headers: {
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            },
-                            timeout: 15000
-                        });
-                        if (subRes.ok) {
-                            const subHtml = await subRes.text();
-                            const _$ = cheerio.load(subHtml);
-                            // Buscar el primer iframe dentro de .ratio-16x9 o directamente en el body
-                            let iframeSrc = '';
-                            const $iframe = _$(".ratio-16x9 iframe").first();
-                            if ($iframe.length) {
-                                iframeSrc = $iframe.attr('src') || '';
-                            } else {
-                                // fallback: buscar cualquier iframe
-                                const $iframe2 = _$("iframe").first();
-                                if ($iframe2.length) iframeSrc = $iframe2.attr('src') || '';
-                            }
-                            if (iframeSrc) {
-                                options.push(iframeSrc);
-                            }
-                        }
-                    } catch (e) {
-                        // Si falla, options vacío
-                    }
-                    // Solo devolver si hay al menos un link válido
-                    if (options.length > 0) {
-                        return {
-                            time: time || '00:00',
-                            title: cleanTitle,
-                            options: options, // array de strings
-                            buttons: ['VIPROW'],
-                            category,
-                            language: 'Inglés',
-                            date,
-                            eventDate: '',
-                            source: 'viprow-motorsports',
-                            image
-                        };
-                    } else {
-                        return null;
-                    }
-                })();
-                eventPromises.push(p);
-            }
-        });
-        const results = await Promise.all(eventPromises);
-        // Filtrar solo los eventos válidos
-        return results.filter(ev => ev && Array.isArray(ev.options) && ev.options.length > 0);
-    } catch (error) {
-        console.error('Error al obtener eventos de VIPRow Motorsports:', error);
-        return [];
-    }
-}
-
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -682,13 +580,12 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, viprowMotorsportsEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingEvents(),
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchWeAreCheckingFootballEvents(),
-            fetchViprowMotorsportsEvents()
+            fetchWeAreCheckingFootballEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
@@ -696,23 +593,14 @@ export default async (req, res) => {
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const wearecheckingFootballEvents = wacFootballEvents.status === 'fulfilled' ? wacFootballEvents.value : [];
-        const viprowEvents = viprowMotorsportsEvents.status === 'fulfilled' ? viprowMotorsportsEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
         if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
-        if (viprowMotorsportsEvents.status === 'rejected') console.error('VIPRow Motorsports falló:', viprowMotorsportsEvents.reason);
 
-        const allEvents = [
-            ...streamEvents,
-            ...alanEvents,
-            ...wearecheckingEvents,
-            ...wearecheckingMotorsportsEvents,
-            ...wearecheckingFootballEvents,
-            ...viprowEvents
-        ];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
@@ -750,18 +638,6 @@ export default async (req, res) => {
                     }
                 }
             }
-            // --- AJUSTE PARA VIPROW ---
-            if (event.source === 'viprow-motorsports') {
-                // Si options está vacío, poner el link principal
-                if (!Array.isArray(event.options) || event.options.length === 0) {
-                    event.options = [event.link];
-                }
-                // Si no hay buttons, poner el nombre del botón
-                if (!Array.isArray(event.buttons) || event.buttons.length === 0) {
-                    event.buttons = [event.button || 'VIPROW'];
-                }
-            }
-            // --- FIN AJUSTE VIPROW ---
             const key = `${event.title || 'Sin título'}__${event.time || '00:00'}__${event.source}`;
             if (!eventMap.has(key)) {
                 let buttonArr = [];
@@ -773,9 +649,6 @@ export default async (req, res) => {
                 } else if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports') && Array.isArray(event.options) && event.options.length > 0) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
-                } else if (event.source === 'viprow-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
-                    buttonArr = event.buttons || [event.button || 'VIPROW'];
-                    optionsArr = event.options;
                 } else if (event.button) {
                     buttonArr = [event.button];
                     optionsArr = [event.link];
@@ -801,13 +674,6 @@ export default async (req, res) => {
                         if (!existing.options.includes(opt.link)) {
                             existing.options.push(opt.link);
                             existing.buttons.push(opt.name.toUpperCase());
-                        }
-                    });
-                } else if (event.source === 'viprow-motorsports' && Array.isArray(event.options)) {
-                    event.options.forEach(opt => {
-                        if (!existing.options.includes(opt)) {
-                            existing.options.push(opt);
-                            existing.buttons.push((event.button || 'VIPROW').toUpperCase());
                         }
                     });
                 } else if (event.link && !existing.options.includes(event.link)) {
