@@ -562,7 +562,7 @@ async function fetchWeAreCheckingFootballEvents() {
 // --- FBStreams Motorsports ---
 /**
  * Scrapea eventos de https://fbstreams.pm/stream/motorsports y extrae el link de transmisión de cada evento
- * Corrige el selector para los <a> de eventos y extrae hora, título y link correctamente.
+ * Ahora asocia correctamente la fecha a cada evento según el separador anterior.
  */
 async function fetchFBStreamsMotorsportsEvents() {
     try {
@@ -579,54 +579,66 @@ async function fetchFBStreamsMotorsportsEvents() {
         const $ = cheerio.load(html);
         const events = [];
         const eventPromises = [];
-        // Seleccionar todos los <a> de evento
-        $('a.btn-dark').each((i, el) => {
+        let currentDate = new Date().toISOString().split('T')[0];
+        // Recorrer hijos de #v8o8c3o7w9 en orden
+        $('#v8o8c3o7w9').children().each((i, el) => {
             const $el = $(el);
-            let link = $el.attr('href') || '';
-            if (link && !link.startsWith('http')) link = 'https://fbstreams.pm' + link;
-            let title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
-            // Extraer hora del <span> si existe
-            let time = $el.find('span.y4v8r4p5o5').text().trim();
-            if (!time) time = '00:00';
-            // Eliminar la hora del título si está incluida
-            if (time && title.includes(time)) {
-                title = title.replace(time, '').trim();
+            // Si es separador de fecha
+            if ($el.hasClass('w6x2l5g8n0')) {
+                const dateText = $el.text().trim();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+                    currentDate = dateText;
+                }
             }
-            // Promesa: entrar al link del evento y extraer el src del iframe
-            if (link) {
-                const p = (async () => {
-                    try {
-                        const subRes = await fetch(link, {
-                            headers: {
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            },
-                            timeout: 15000
-                        });
-                        if (!subRes.ok) return;
-                        const subHtml = await subRes.text();
-                        const $sub = cheerio.load(subHtml);
-                        // Buscar el iframe de la transmisión
-                        let iframeSrc = $sub('div.ratio iframe').attr('src') || '';
-                        if (iframeSrc && iframeSrc.startsWith('/')) iframeSrc = 'https://fbstreams.pm' + iframeSrc;
-                        if (iframeSrc) {
-                            events.push({
-                                time,
-                                title: title || 'Evento FBStreams',
-                                link: iframeSrc,
-                                button: 'FBSTREAMS',
-                                category: 'Motorsports',
-                                language: 'Inglés',
-                                date: new Date().toISOString().split('T')[0],
-                                source: 'fbstreams-motorsports',
-                                image: 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
-                                options: [{ name: 'FBSTREAMS', link: iframeSrc }]
+            // Si es un evento
+            if ($el.is('a.btn.btn-dark')) {
+                let link = $el.attr('href') || '';
+                if (link && !link.startsWith('http')) link = 'https://fbstreams.pm' + link;
+                let title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
+                // Extraer hora del <span> si existe
+                let time = $el.find('span.y4v8r4p5o5').text().trim();
+                if (!time) time = '00:00';
+                // Eliminar la hora del título si está incluida
+                if (time && title.includes(time)) {
+                    title = title.replace(time, '').trim();
+                }
+                // Promesa: entrar al link del evento y extraer el src del iframe
+                if (link) {
+                    const eventDate = currentDate;
+                    const p = (async () => {
+                        try {
+                            const subRes = await fetch(link, {
+                                headers: {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                },
+                                timeout: 15000
                             });
+                            if (!subRes.ok) return;
+                            const subHtml = await subRes.text();
+                            const $sub = cheerio.load(subHtml);
+                            // Buscar el iframe de la transmisión
+                            let iframeSrc = $sub('div.ratio iframe').attr('src') || '';
+                            if (iframeSrc && iframeSrc.startsWith('/')) iframeSrc = 'https://fbstreams.pm' + iframeSrc;
+                            if (iframeSrc) {
+                                events.push({
+                                    time,
+                                    title: title || 'Evento FBStreams',
+                                    link: iframeSrc,
+                                    button: 'FBSTREAMS',
+                                    category: 'Motorsports',
+                                    language: 'Inglés',
+                                    date: eventDate,
+                                    source: 'fbstreams-motorsports',
+                                    image: 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
+                                    options: [{ name: 'FBSTREAMS', link: iframeSrc }]
+                                });
+                            }
+                        } catch (e) {
+                            // Ignorar errores individuales
                         }
-                    } catch (e) {
-                        // Ignorar errores individuales
-                    }
-                })();
-                eventPromises.push(p);
+                    })();
+                    eventPromises.push(p);
+                }
             }
         });
         await Promise.all(eventPromises);
