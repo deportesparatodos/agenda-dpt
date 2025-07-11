@@ -582,7 +582,6 @@ async function fetchFBStreamsMotorsportsEvents(html) {
         if ($el.hasClass('btn-info')) {
             // Extraer la fecha (YYYY-MM-DD)
             const dateText = $el.text().trim();
-            // Buscar en el atributo data-d5i7a1e9h5 de algún hijo, si existe
             const dateAttr = $el.find('[data-d5i7a1e9h5]').attr('data-d5i7a1e9h5');
             currentDate = dateAttr || dateText;
         }
@@ -601,20 +600,18 @@ async function fetchFBStreamsMotorsportsEvents(html) {
             if (!time) time = '';
             // Si no hay fecha, usar la actual
             if (!date) date = new Date().toISOString().split('T')[0];
-            // Evento
+            // Adaptar a la estructura de la API
             events.push({
                 time,
                 title,
-                link,
-                button,
+                options: [link],
+                buttons: [button],
                 category,
                 language,
                 date,
+                eventDay: date,
                 source,
-                image,
-                options: [
-                    { name: 'Ver evento', link }
-                ]
+                image
             });
         }
     });
@@ -642,12 +639,18 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, fbstreamsMotorsportsHtml] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingEvents(),
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchWeAreCheckingFootballEvents()
+            fetchWeAreCheckingFootballEvents(),
+            fetch('https://fbstreams.pm/stream/motorsports', {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                },
+                timeout: 15000
+            })
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
@@ -655,14 +658,26 @@ export default async (req, res) => {
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const wearecheckingFootballEvents = wacFootballEvents.status === 'fulfilled' ? wacFootballEvents.value : [];
-        
-        if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
-        if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
-        if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
-        if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
-        if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
+        let fbstreamsMotorsportsEvents = [];
+        if (fbstreamsMotorsportsHtml.status === 'fulfilled' && fbstreamsMotorsportsHtml.value.ok) {
+            const html = await fbstreamsMotorsportsHtml.value.text();
+            try {
+                fbstreamsMotorsportsEvents = await fetchFBStreamsMotorsportsEvents(html);
+            } catch (e) {
+                console.error('Error procesando eventos de FBStreams Motorsports:', e);
+            }
+        } else {
+            if (fbstreamsMotorsportsHtml.status === 'rejected') console.error('FBStreams Motorsports falló:', fbstreamsMotorsportsHtml.reason);
+        }
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents];
+        const allEvents = [
+            ...streamEvents,
+            ...alanEvents,
+            ...wearecheckingEvents,
+            ...wearecheckingMotorsportsEvents,
+            ...wearecheckingFootballEvents,
+            ...fbstreamsMotorsportsEvents
+        ];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
