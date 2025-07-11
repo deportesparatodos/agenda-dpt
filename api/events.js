@@ -559,6 +559,68 @@ async function fetchWeAreCheckingFootballEvents() {
     }
 }
 
+/**
+ * Scrapea eventos de https://fbstreams.pm/stream/motorsports
+ * Usa el HTML proporcionado (no hace fetch real, sino que espera el HTML como string)
+ * Todos los eventos llevan la imagen de race car indicada
+ */
+async function fetchFBStreamsMotorsportsEvents(html) {
+    const cheerio = require('cheerio');
+    const $ = cheerio.load(html);
+    const events = [];
+    // Buscar los bloques de eventos dentro del contenedor con id 'v8t6d2j7i9'
+    const image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
+    const source = 'fbstreams';
+    const button = 'FBSTREAM';
+    const category = 'Motorsports';
+    const language = 'Inglés';
+    // Recorrer los días y eventos
+    let currentDate = null;
+    $('#v8t6d2j7i9').children().each((i, el) => {
+        const $el = $(el);
+        // Detectar cambio de fecha
+        if ($el.hasClass('btn-info')) {
+            // Extraer la fecha (YYYY-MM-DD)
+            const dateText = $el.text().trim();
+            // Buscar en el atributo data-d5i7a1e9h5 de algún hijo, si existe
+            const dateAttr = $el.find('[data-d5i7a1e9h5]').attr('data-d5i7a1e9h5');
+            currentDate = dateAttr || dateText;
+        }
+        // Detectar evento
+        if ($el.is('a.btn.btn-dark')) {
+            // Título
+            const title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
+            // Link
+            let link = $el.attr('href');
+            if (link && !/^http/.test(link)) link = 'https://fbstreams.pm' + link;
+            // Hora
+            let time = $el.find('.s2m7s8x4e4').first().text().trim();
+            // Fecha
+            let date = $el.find('.s2m7s8x4e4').attr('data-d5i7a1e9h5') || currentDate;
+            // Si no hay hora, dejar en blanco
+            if (!time) time = '';
+            // Si no hay fecha, usar la actual
+            if (!date) date = new Date().toISOString().split('T')[0];
+            // Evento
+            events.push({
+                time,
+                title,
+                link,
+                button,
+                category,
+                language,
+                date,
+                source,
+                image,
+                options: [
+                    { name: 'Ver evento', link }
+                ]
+            });
+        }
+    });
+    return events;
+}
+
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
