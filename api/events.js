@@ -576,8 +576,8 @@ async function fetchViprowMotorsportsEvents() {
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
-        // Buscar todos los <a> que sean eventos motorsports
-        $("a.btn.btn-primary").each((i, el) => {
+        // Buscar todos los <a> que sean eventos motorsports SOLO dentro del div principal
+        $("#z4d3u2n5o3 a.btn.btn-primary").each((i, el) => {
             const $a = $(el);
             const href = $a.attr('href');
             const title = $a.attr('title') || $a.text().replace(/\s+/g, ' ').trim();
@@ -587,7 +587,6 @@ async function fetchViprowMotorsportsEvents() {
             if ($span.length) {
                 time = $span.text().trim();
             } else {
-                // Si no hay span, intentar extraer hora del texto (opcional)
                 time = '';
             }
             // Eliminar la hora del título si está duplicada
@@ -595,15 +594,11 @@ async function fetchViprowMotorsportsEvents() {
             if (time && cleanTitle.includes(time)) {
                 cleanTitle = cleanTitle.replace(time, '').trim();
             }
-            // Si el título empieza con un número (hora), quitarlo
-            cleanTitle = cleanTitle.replace(/^\d{1,2}:\d{2}\s*/, '');
+            cleanTitle = cleanTitle.replace(/^[0-9]{1,2}:[0-9]{2}\s*/, '');
             // Imagen específica SOLO para VIPRow
             const image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
-            // Fecha (vacía, VIPRow no la da)
             const date = '';
-            // Categoría
             let category = 'Motorsports';
-            // Estructura igual a otros eventos
             if (href && cleanTitle) {
                 events.push({
                     time: time || '00:00',
