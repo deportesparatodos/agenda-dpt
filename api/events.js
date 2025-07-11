@@ -559,20 +559,14 @@ async function fetchWeAreCheckingFootballEvents() {
     }
 }
 
-// --- VipLeague Motorsports (NUEVO: estructura HTML real) ---
 /**
- * Scrapea eventos de https://vipleague.im/motorsports-schedule-streaming-links usando la estructura real del HTML proporcionado.
- * - Contenedor: #i0c2n9t7s8
- * - Fechas: .v6k0x5j0i9
- * - Eventos: <a class="btn btn-dark ...">
- * - Hora: <span class="m0d1e3t1f6 me-2">
- * - Título: texto del <a> quitando el span
- * - Link: href del <a>, entrar y extraer src del primer <iframe>
+ * Scrapea eventos de https://www.viprow.nu/sports-motorsports-online
+ * Extrae título, hora, fecha, link y deja options como placeholder para el embed.
  */
-async function fetchVipLeagueMotorsportsEvents() {
+async function fetchViprowMotorsportsEvents() {
     try {
-        const url = 'https://vipleague.im/motorsports-schedule-streaming-links';
-        console.log('Fetching VipLeague Motorsports eventos desde', url);
+        const url = 'https://www.viprow.nu/sports-motorsports-online';
+        console.log('Fetching VIPRow Motorsports eventos desde', url);
         const response = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -583,76 +577,42 @@ async function fetchVipLeagueMotorsportsEvents() {
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
-        const eventPromises = [];
-        let currentDate = null;
-        // Recorrer hijos de #i0c2n9t7s8 en orden
-        $('#i0c2n9t7s8').children().each((i, el) => {
-            const $el = $(el);
-            // Si es separador de fecha
-            if ($el.hasClass('v6k0x5j0i9')) {
-                currentDate = $el.text().trim();
-                return;
+        // Buscar todos los <a> de eventos en la lista central
+        $("#g8v0c6p4z5 a.mb-1.btn.btn-primary").each((i, el) => {
+            const $a = $(el);
+            const title = $a.attr('title') || $a.text().replace(/\s+/g, ' ').trim();
+            const link = $a.attr('href') ? `https://www.viprow.nu${$a.attr('href')}` : '';
+            // Extraer hora y fecha si existen
+            const $span = $a.find('span.r5y3a9g1b7');
+            let time = '00:00';
+            let date = new Date().toISOString().split('T')[0];
+            if ($span.length) {
+                time = $span.text().trim();
+                const spanDate = $span.attr('data-b0z9c3e6f6');
+                if (spanDate) date = spanDate;
             }
-            // Si es un evento
-            if ($el.is('a.btn-dark')) {
-                let link = $el.attr('href') || '';
-                if (link && !link.startsWith('http')) link = 'https://vipleague.im' + link;
-                // Extraer hora
-                let time = $el.find('span.m0d1e3t1f6').text().trim();
-                if (!time) time = '00:00';
-                // Limpiar título: quitar el span de la hora del texto
-                let title = '';
-                if ($el.find('span.m0d1e3t1f6').length > 0) {
-                    const $clone = $el.clone();
-                    $clone.find('span.m0d1e3t1f6').remove();
-                    title = $clone.text().replace(/\s+/g, ' ').trim();
-                } else {
-                    title = $el.text().replace(/\s+/g, ' ').trim();
-                }
-                // Promesa: entrar al link del evento y extraer el src del iframe
-                if (link) {
-                    const date = currentDate || new Date().toISOString().split('T')[0];
-                    const p = (async () => {
-                        try {
-                            const subRes = await fetch(link, {
-                                headers: {
-                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                                },
-                                timeout: 15000
-                            });
-                            if (!subRes.ok) return;
-                            const subHtml = await subRes.text();
-                            const $sub = cheerio.load(subHtml);
-                            // Buscar el primer iframe de la transmisión
-                            let iframeSrc = $sub('iframe').attr('src') || '';
-                            if (iframeSrc && iframeSrc.startsWith('/')) iframeSrc = 'https://vipleague.im' + iframeSrc;
-                            if (iframeSrc) {
-                                events.push({
-                                    time,
-                                    title: title || 'Evento VipLeague',
-                                    link: iframeSrc,
-                                    button: 'VIPLEAGUE',
-                                    category: 'Motorsports',
-                                    language: 'Inglés',
-                                    date,
-                                    source: 'vipleague-motorsports',
-                                    image: 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
-                                    options: [{ name: 'VIPLEAGUE', link: iframeSrc }]
-                                });
-                            }
-                        } catch (e) {
-                            // Ignorar errores individuales
-                        }
-                    })();
-                    eventPromises.push(p);
-                }
-            }
+            // Imagen por defecto motorsports
+            let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
+            // Categoría por defecto
+            let category = 'Motorsports';
+            // Placeholder para options (embed)
+            const options = [{ name: 'VIPRow', link }];
+            events.push({
+                time,
+                title,
+                link,
+                button: 'VIPROW',
+                category,
+                language: 'Inglés',
+                date,
+                source: 'viprow-motorsports',
+                image,
+                options
+            });
         });
-        await Promise.all(eventPromises);
-        console.log(`VipLeague Motorsports: ${events.length} eventos obtenidos`);
         return events;
     } catch (error) {
-        console.error('Error al obtener eventos de VipLeague Motorsports:', error);
+        console.error('Error al obtener eventos de VIPRow Motorsports:', error);
         return [];
     }
 }
@@ -678,13 +638,13 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, vipLeagueMotorsports] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, viprowMotorsportsEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingEvents(),
             fetchWeAreCheckingMotorsportsEvents(),
             fetchWeAreCheckingFootballEvents(),
-            fetchVipLeagueMotorsportsEvents()
+            fetchViprowMotorsportsEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
@@ -692,14 +652,14 @@ export default async (req, res) => {
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const wearecheckingFootballEvents = wacFootballEvents.status === 'fulfilled' ? wacFootballEvents.value : [];
-        const vipLeagueEvents = vipLeagueMotorsports.status === 'fulfilled' ? vipLeagueMotorsports.value : [];
+        const viprowEvents = viprowMotorsportsEvents.status === 'fulfilled' ? viprowMotorsportsEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
         if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
-        if (vipLeagueMotorsports.status === 'rejected') console.error('VipLeague Motorsports falló:', vipLeagueMotorsports.reason);
+        if (viprowMotorsportsEvents.status === 'rejected') console.error('VIPRow Motorsports falló:', viprowMotorsportsEvents.reason);
 
         const allEvents = [
             ...streamEvents,
@@ -707,7 +667,7 @@ export default async (req, res) => {
             ...wearecheckingEvents,
             ...wearecheckingMotorsportsEvents,
             ...wearecheckingFootballEvents,
-            ...vipLeagueEvents
+            ...viprowEvents
         ];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
