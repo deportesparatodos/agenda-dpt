@@ -559,10 +559,15 @@ async function fetchWeAreCheckingFootballEvents() {
     }
 }
 
-// --- VipLeague Motorsports ---
+// --- VipLeague Motorsports (NUEVO: estructura HTML real) ---
 /**
- * Scrapea eventos de https://vipleague.im/motorsports-schedule-streaming-links y extrae el link de transmisión de cada evento
- * Recorre los hijos de #v3p2n8d1z2 en orden, asocia la fecha correcta y extrae hora, título y link correctamente.
+ * Scrapea eventos de https://vipleague.im/motorsports-schedule-streaming-links usando la estructura real del HTML proporcionado.
+ * - Contenedor: #i0c2n9t7s8
+ * - Fechas: .v6k0x5j0i9
+ * - Eventos: <a class="btn btn-dark ...">
+ * - Hora: <span class="m0d1e3t1f6 me-2">
+ * - Título: texto del <a> quitando el span
+ * - Link: href del <a>, entrar y extraer src del primer <iframe>
  */
 async function fetchVipLeagueMotorsportsEvents() {
     try {
@@ -580,11 +585,11 @@ async function fetchVipLeagueMotorsportsEvents() {
         const events = [];
         const eventPromises = [];
         let currentDate = null;
-        // Recorrer hijos de #v3p2n8d1z2 en orden
-        $('#v3p2n8d1z2').children().each((i, el) => {
+        // Recorrer hijos de #i0c2n9t7s8 en orden
+        $('#i0c2n9t7s8').children().each((i, el) => {
             const $el = $(el);
             // Si es separador de fecha
-            if ($el.hasClass('f1l1d0t8p4')) {
+            if ($el.hasClass('v6k0x5j0i9')) {
                 currentDate = $el.text().trim();
                 return;
             }
@@ -592,15 +597,17 @@ async function fetchVipLeagueMotorsportsEvents() {
             if ($el.is('a.btn-dark')) {
                 let link = $el.attr('href') || '';
                 if (link && !link.startsWith('http')) link = 'https://vipleague.im' + link;
-                let title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
-                // Extraer hora del <span> si existe
-                let time = $el.find('span.n9l5v5r1t3').text().trim();
+                // Extraer hora
+                let time = $el.find('span.m0d1e3t1f6').text().trim();
                 if (!time) time = '00:00';
                 // Limpiar título: quitar el span de la hora del texto
-                if ($el.find('span.n9l5v5r1t3').length > 0) {
+                let title = '';
+                if ($el.find('span.m0d1e3t1f6').length > 0) {
                     const $clone = $el.clone();
-                    $clone.find('span.n9l5v5r1t3').remove();
+                    $clone.find('span.m0d1e3t1f6').remove();
                     title = $clone.text().replace(/\s+/g, ' ').trim();
+                } else {
+                    title = $el.text().replace(/\s+/g, ' ').trim();
                 }
                 // Promesa: entrar al link del evento y extraer el src del iframe
                 if (link) {
@@ -616,8 +623,8 @@ async function fetchVipLeagueMotorsportsEvents() {
                             if (!subRes.ok) return;
                             const subHtml = await subRes.text();
                             const $sub = cheerio.load(subHtml);
-                            // Buscar el iframe de la transmisión
-                            let iframeSrc = $sub('div.ratio iframe').attr('src') || $sub('iframe').attr('src') || '';
+                            // Buscar el primer iframe de la transmisión
+                            let iframeSrc = $sub('iframe').attr('src') || '';
                             if (iframeSrc && iframeSrc.startsWith('/')) iframeSrc = 'https://vipleague.im' + iframeSrc;
                             if (iframeSrc) {
                                 events.push({
