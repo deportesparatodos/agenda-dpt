@@ -559,6 +559,86 @@ async function fetchWeAreCheckingFootballEvents() {
     }
 }
 
+// --- FBStreams Motorsports ---
+/**
+ * Scrapea eventos de https://fbstreams.pm/stream/motorsports y extrae el link de transmisión de cada evento
+ */
+async function fetchFBStreamsMotorsportsEvents() {
+    try {
+        const url = 'https://fbstreams.pm/stream/motorsports';
+        console.log('Fetching FBStreams Motorsports eventos desde', url);
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            timeout: 15000
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        const events = [];
+        const eventPromises = [];
+        // Cada evento está en un .card o similar (ajustar si cambia el selector)
+        $('.card, .event-card, .list-group-item').each((i, el) => {
+            const $el = $(el);
+            // Título del evento
+            let title = $el.find('.card-title, .event-title, .list-group-item-heading').text().trim();
+            if (!title) title = $el.find('a').first().text().trim();
+            // Link al evento
+            let link = $el.find('a').attr('href') || '';
+            if (link && !link.startsWith('http')) link = 'https://fbstreams.pm' + link;
+            // Hora (si existe)
+            let time = $el.find('.event-time, .badge, .list-group-item-text').first().text().trim();
+            if (!time) time = '00:00';
+            // Imagen (si existe)
+            let image = $el.find('img').attr('src') || '';
+            if (image && image.startsWith('/')) image = 'https://fbstreams.pm' + image;
+            // Promesa: entrar al link del evento y extraer el src del iframe
+            if (link) {
+                const p = (async () => {
+                    try {
+                        const subRes = await fetch(link, {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            },
+                            timeout: 15000
+                        });
+                        if (!subRes.ok) return;
+                        const subHtml = await subRes.text();
+                        const $sub = cheerio.load(subHtml);
+                        // Buscar el iframe de la transmisión
+                        let iframeSrc = $sub('div.ratio iframe').attr('src') || '';
+                        if (iframeSrc && iframeSrc.startsWith('/')) iframeSrc = 'https://fbstreams.pm' + iframeSrc;
+                        if (iframeSrc) {
+                            events.push({
+                                time,
+                                title: title || 'Evento FBStreams',
+                                link: iframeSrc,
+                                button: 'FBSTREAMS',
+                                category: 'Motorsports',
+                                language: 'Inglés',
+                                date: new Date().toISOString().split('T')[0],
+                                source: 'fbstreams-motorsports',
+                                image: image || 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
+                                options: [{ name: 'FBSTREAMS', link: iframeSrc }]
+                            });
+                        }
+                    } catch (e) {
+                        // Ignorar errores individuales
+                    }
+                })();
+                eventPromises.push(p);
+            }
+        });
+        await Promise.all(eventPromises);
+        console.log(`FBStreams Motorsports: ${events.length} eventos obtenidos`);
+        return events;
+    } catch (error) {
+        console.error('Error al obtener eventos de FBStreams Motorsports:', error);
+        return [];
+    }
+}
+
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -580,12 +660,13 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, fbstreamsMotorsportsEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingEvents(),
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchWeAreCheckingFootballEvents()
+            fetchWeAreCheckingFootballEvents(),
+            fetchFBStreamsMotorsportsEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
@@ -593,14 +674,23 @@ export default async (req, res) => {
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const wearecheckingFootballEvents = wacFootballEvents.status === 'fulfilled' ? wacFootballEvents.value : [];
+        const fbstreamsEvents = fbstreamsMotorsportsEvents.status === 'fulfilled' ? fbstreamsMotorsportsEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
         if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
+        if (fbstreamsMotorsportsEvents.status === 'rejected') console.error('FBStreams Motorsports falló:', fbstreamsMotorsportsEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents];
+        const allEvents = [
+            ...streamEvents,
+            ...alanEvents,
+            ...wearecheckingEvents,
+            ...wearecheckingMotorsportsEvents,
+            ...wearecheckingFootballEvents,
+            ...fbstreamsEvents
+        ];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
