@@ -440,7 +440,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
                 let date = '';
                 // Imagen FIJA para todos los eventos de motorsports
-                image = 'https://images.vexels.com/media/users/3/139434/isolated/preview/4bcbe9b4d3e6f6e4c1207c142a98c2d8-carrera-de-coches-de-carreras-de-ferrari.png';
+                image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
                 const eventObj = {
                     time,
                     title,
@@ -576,14 +576,11 @@ async function fetchViprowMotorsportsEvents() {
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         const html = await response.text();
         const $ = cheerio.load(html);
-        const events = [];
         const eventPromises = [];
-        // Buscar todos los <a> de eventos en la lista central
         $("#g8v0c6p4z5 a.mb-1.btn.btn-primary").each((i, el) => {
             const $a = $(el);
             const title = $a.attr('title') || $a.text().replace(/\s+/g, ' ').trim();
             const link = $a.attr('href') ? `https://www.viprow.nu${$a.attr('href')}` : '';
-            // Extraer hora y fecha si existen
             const $span = $a.find('span.r5y3a9g1b7');
             let time = '00:00';
             let date = new Date().toISOString().split('T')[0];
@@ -593,10 +590,10 @@ async function fetchViprowMotorsportsEvents() {
                 if (spanDate) date = spanDate;
             }
             // Imagen por defecto motorsports
-            let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
+            let image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
             // Categoría por defecto
             let category = 'Motorsports';
-            // Promesa para entrar al link y extraer el embed real
+            // Promesa para procesar cada evento
             const p = (async () => {
                 try {
                     if (!link) return null;
@@ -609,35 +606,86 @@ async function fetchViprowMotorsportsEvents() {
                     if (!subRes.ok) return null;
                     const subHtml = await subRes.text();
                     const $sub = cheerio.load(subHtml);
-                    // Buscar el primer iframe o embed
-                    let realLink = '';
-                    const $iframe = $sub('iframe');
-                    if ($iframe.length > 0) {
-                        realLink = $iframe.first().attr('src') || '';
-                    } else {
-                        // Buscar <embed> si no hay iframe
-                        const $embed = $sub('embed');
-                        if ($embed.length > 0) {
-                            realLink = $embed.first().attr('src') || '';
+                    // Buscar todos los links de botones dentro de #f7o5o3x8w1
+                    const options = [];
+                    $sub('#f7o5o3x8w1 a.btn-link[data-uri]').each((j, btn) => {
+                        const $btn = $sub(btn);
+                        const btnName = $btn.text().replace(/\s+/g, ' ').trim() || `Link ${j+1}`;
+                        let dataUri = $btn.attr('data-uri');
+                        if (dataUri && dataUri.startsWith('/')) {
+                            dataUri = `https://www.viprow.nu${dataUri}`;
+                        }
+                        options.push({ name: btnName, dataUri });
+                    });
+                    // Si no hay opciones, intentar extraer el iframe de la página principal
+                    if (options.length === 0) {
+                        let realLink = '';
+                        const $iframe = $sub('iframe');
+                        if ($iframe.length > 0) {
+                            realLink = $iframe.first().attr('src') || '';
+                        }
+                        if (realLink && realLink.startsWith('/')) {
+                            realLink = `https://www.viprow.nu${realLink}`;
+                        }
+                        if (realLink) {
+                            return {
+                                time,
+                                title,
+                                link: realLink,
+                                button: 'VIPROW',
+                                category,
+                                language: 'Inglés',
+                                date,
+                                source: 'viprow-motorsports',
+                                image,
+                                options: [{ name: 'VIPROW', link: realLink }]
+                            };
+                        } else {
+                            return null;
                         }
                     }
-                    // Si el link es relativo, hacerlo absoluto
-                    if (realLink && realLink.startsWith('/')) {
-                        realLink = `https://www.viprow.nu${realLink}`;
-                    }
-                    // Si no se encontró link real, usar el link a la página como fallback
-                    if (!realLink) realLink = link;
+                    // Para cada opción, entrar y extraer el link real del iframe
+                    const optionPromises = options.map(async (opt) => {
+                        try {
+                            if (!opt.dataUri) return null;
+                            const optRes = await fetch(opt.dataUri, {
+                                headers: {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                },
+                                timeout: 15000
+                            });
+                            if (!optRes.ok) return null;
+                            const optHtml = await optRes.text();
+                            const $opt = cheerio.load(optHtml);
+                            let realLink = '';
+                            const $iframe = $opt('div.ratio.ratio-16x9.bg-dark iframe');
+                            if ($iframe.length > 0) {
+                                realLink = $iframe.first().attr('src') || '';
+                            }
+                            if (realLink && realLink.startsWith('/')) {
+                                realLink = `https://www.viprow.nu${realLink}`;
+                            }
+                            if (realLink) {
+                                return { name: opt.name, link: realLink };
+                            }
+                            return null;
+                        } catch (e) {
+                            return null;
+                        }
+                    });
+                    const realOptions = (await Promise.all(optionPromises)).filter(x => x && x.link);
+                    if (realOptions.length === 0) return null;
                     return {
                         time,
                         title,
-                        link: realLink,
-                        button: 'VIPROW',
+                        link: realOptions[0].link,
+                        button: realOptions[0].name,
                         category,
                         language: 'Inglés',
                         date,
                         source: 'viprow-motorsports',
                         image,
-                        options: [{ name: 'VIPROW', link: realLink }]
+                        options: realOptions
                     };
                 } catch (e) {
                     return null;
