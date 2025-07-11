@@ -143,6 +143,7 @@ async function fetchAlanGuloTVEvents(config) {
                     $linksContainer.find('.link-button, a').each((i, linkEl) => {
                         const $link = $(linkEl);
                         const href = $link.attr('href');
+                        // Usar el nombre del botón de la agenda principal, no el de la subpágina
                         const buttonName = $link.text().trim() || 'CANAL';
                         if (href) {
                             // Construir URL absoluta si es relativa
@@ -181,7 +182,7 @@ async function fetchAlanGuloTVEvents(config) {
                                                         time,
                                                         title,
                                                         link: finalLink,
-                                                        button: buttonName,
+                                                        button: buttonName, // nombre del botón de la agenda principal
                                                         category: 'Deportes',
                                                         language: 'Español',
                                                         date: new Date().toISOString().split('T')[0],
