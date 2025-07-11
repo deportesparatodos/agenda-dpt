@@ -589,8 +589,11 @@ async function fetchViprowMotorsportsEvents() {
                 const spanDate = $span.attr('data-b0z9c3e6f6');
                 if (spanDate) date = spanDate;
             }
-            // Imagen por defecto motorsports
-            let image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
+            // Imagen por defecto motorsports SOLO para VIPRow
+            let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
+            if (category === 'Motorsports') {
+                image = 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png';
+            }
             // Categoría por defecto
             let category = 'Motorsports';
             // Promesa para procesar cada evento
@@ -665,15 +668,13 @@ async function fetchViprowMotorsportsEvents() {
                             if (realLink && realLink.startsWith('/')) {
                                 realLink = `https://www.viprow.nu${realLink}`;
                             }
-                            if (realLink) {
-                                return { name: opt.name, link: realLink };
-                            }
-                            return null;
+                            // Si no se encuentra el iframe, dejar el link en blanco
+                            return { name: opt.name, link: realLink || '' };
                         } catch (e) {
-                            return null;
+                            return { name: opt.name, link: '' };
                         }
                     });
-                    const realOptions = (await Promise.all(optionPromises)).filter(x => x && x.link);
+                    const realOptions = (await Promise.all(optionPromises)).filter(x => x && typeof x.link === 'string');
                     if (realOptions.length === 0) return null;
                     return {
                         time,
