@@ -100,8 +100,11 @@ async function fetchStreamTpGlobalEvents() {
 
 /**
  * Función para hacer scraping de alangulotv usando Cheerio
+ * ACTUALIZADA JULIO 2025: scrapea https://alangulotv.me/agenda-2/ y para cada botón entra a su link,
+ * extrae el objeto channels y busca la key correspondiente para obtener el link real.
  */
 async function fetchAlanGuloTVEvents(config) {
+    // Usar la nueva URL fija
     const agendaUrl = 'https://alangulotv.me/agenda-2/';
     const linkDomain = 'p.alangulotv.space';
     try {
@@ -140,11 +143,15 @@ async function fetchAlanGuloTVEvents(config) {
                     $linksContainer.find('.link-button, a').each((i, linkEl) => {
                         const $link = $(linkEl);
                         const href = $link.attr('href');
+                        // Usar el nombre del botón de la agenda principal, no el de la subpágina
                         const buttonName = $link.text().trim() || 'CANAL';
                         if (href) {
+                            // Construir URL absoluta si es relativa
                             let eventPageUrl = href.startsWith('http') ? href : `https://alangulotv.me${href}`;
+                            // Extraer la key de canal de la URL
                             const pathParts = href.split('/').filter(part => part.length > 0);
                             const linkKey = pathParts[pathParts.length - 1];
+                            // Promesa: entrar a la página del botón, extraer channels y buscar la key
                             const p = (async () => {
                                 try {
                                     const subRes = await fetch(eventPageUrl, {
@@ -155,6 +162,7 @@ async function fetchAlanGuloTVEvents(config) {
                                     });
                                     if (!subRes.ok) return;
                                     const subHtml = await subRes.text();
+                                    // Buscar el objeto channels en el <script>
                                     const channelsMatch = subHtml.match(/const\s+channels\s*=\s*(\{[\s\S]*?\});/);
                                     if (channelsMatch && channelsMatch[1]) {
                                         let channelsObj;
@@ -163,6 +171,7 @@ async function fetchAlanGuloTVEvents(config) {
                                         } catch (e) {
                                             return;
                                         }
+                                        // Buscar la key
                                         if (channelsObj[linkKey]) {
                                             const channelData = channelsObj[linkKey];
                                             const firstAvailableKey = Object.keys(channelData)[0];
@@ -173,7 +182,7 @@ async function fetchAlanGuloTVEvents(config) {
                                                         time,
                                                         title,
                                                         link: finalLink,
-                                                        button: buttonName,
+                                                        button: buttonName, // nombre del botón de la agenda principal
                                                         category: 'Deportes',
                                                         language: 'Español',
                                                         date: new Date().toISOString().split('T')[0],
@@ -228,19 +237,24 @@ async function fetchWeAreCheckingEvents() {
             const $feed = $wrapper.find('.stream-feed');
             const onclick = $feed.attr('onclick');
             if (onclick && onclick.includes("location.href='/streams/")) {
+                // Extraer link
                 const match = onclick.match(/location.href='([^']+)'/);
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
+                // Extraer título y hora
                 const $p = $feed.find('p');
                 let time = '00:00';
                 let date = new Date().toISOString().split('T')[0];
                 let title = $p.text().trim();
+                // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
                     let spanText = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
+                    // Si el texto es un número, es un timestamp y hay que formatearlo
                     if (/^\d{10,}$/.test(spanText)) {
                         const unix = parseInt(spanText);
                         if (!isNaN(unix)) {
                             const eventDate = new Date(unix * 1000);
+                            // Formato: 1 jul, 01:00 a.m.
                             const day = eventDate.getDate();
                             const month = eventDate.toLocaleString('es-ES', { month: 'short' });
                             let hour = eventDate.getHours();
@@ -255,20 +269,23 @@ async function fetchWeAreCheckingEvents() {
                     if (spanText) {
                         time = spanText;
                     }
+                    // El título es el texto después del span
                     title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
                 }
+                // Imagen FIJA para others
                 let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
+                // Promesa para obtener los links reales
                 const eventObj = {
                     time,
                     title,
-                    link,
+                    link, // link a la página del evento
                     button: 'WAC',
                     category: 'Otros',
                     language: 'Inglés',
                     date,
                     source: 'wearechecking',
                     image,
-                    options: []
+                    options: [] // se llenará luego
                 };
                 const p = fetchWACLinksForEvent(link).then(options => {
                     eventObj.options = options;
@@ -278,6 +295,7 @@ async function fetchWeAreCheckingEvents() {
             }
         });
         const results = await Promise.all(eventPromises);
+        // Solo eventos con al menos una opción válida
         return results.filter(ev => ev.options && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de WeAreChecking:', error);
@@ -334,14 +352,17 @@ async function fetchWeAreCheckingMotorsportsEvents() {
         const $ = cheerio.load(html);
         const events = [];
         const eventPromises = [];
+        // Recorrer todos los stream-wrapper de motorsports
         $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
             const $wrapper = $(el);
+            // Imagen de la categoría
             let image = $wrapper.find('.stream-thumb').attr('src') || '';
             if (image && image.startsWith('..')) {
                 image = 'https://wearechecking.online/' + image.replace(/^\.\./, '').replace(/^\//, '');
             } else if (image && image.startsWith('/')) {
                 image = 'https://wearechecking.online' + image;
             }
+            // Nombre de la categoría
             let category = $wrapper.find('.series-title img').attr('alt') || '';
             if (category) {
                 category = category.replace(/^(series-title-)?/i, '').replace(/\.svg$/i, '').replace(/[-_]/g, ' ').trim();
@@ -349,22 +370,27 @@ async function fetchWeAreCheckingMotorsportsEvents() {
             } else {
                 category = 'Motorsports';
             }
+            // Recorrer todos los .stream-feed con onclick (eventos reales)
             $wrapper.find('.stream-feed[onclick]').each((j, feedEl) => {
                 const $feed = $(feedEl);
                 const onclick = $feed.attr('onclick');
                 const match = onclick ? onclick.match(/location.href='([^']+)'/) : null;
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
                 const $p = $feed.find('p');
+                // Si no hay <p> o dice "No events", saltar
                 if ($p.length === 0 || /No events/i.test($p.text())) return;
+                // Extraer hora y fecha desde el span
                 let time = '00:00';
                 let eventDate = '';
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
+                    // Ejemplo: "11 jul, 02:40 a.m. ￨ "
                     let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                    // Separar fecha y hora
                     const fechaHoraMatch = spanText.match(/^(\d{1,2} \w{3}), (\d{2}):(\d{2}) ([ap])\.m\./i);
                     if (fechaHoraMatch) {
-                        eventDate = fechaHoraMatch[1];
+                        eventDate = fechaHoraMatch[1]; // "11 jul"
                         let hour = parseInt(fechaHoraMatch[2], 10);
                         const minute = fechaHoraMatch[3];
                         const ampm = fechaHoraMatch[4].toLowerCase();
@@ -372,10 +398,13 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                         if (ampm === 'a' && hour === 12) hour = 0;
                         time = `${String(hour).padStart(2, '0')}:${minute}`;
                     } else {
+                        // Si no matchea, usar todo el span como hora
                         time = spanText;
+                        // Intentar extraer solo la fecha si es posible
                         const soloFecha = spanText.match(/^(\d{1,2} \w{3})/i);
                         if (soloFecha) eventDate = soloFecha[1];
                     }
+                    // Extraer nombre de la card/categoría desde la clase del wrapper
                     let cardName = '';
                     const wrapperClass = $wrapper.attr('class') || '';
                     const cardMatch = wrapperClass.match(/wrapper-([\w\d]+)/i);
@@ -384,18 +413,22 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     } else {
                         cardName = category || '';
                     }
+                    // Normalizar nombres especiales
                     if (cardName.toLowerCase() === 'fe') {
                         cardName = 'Formula E';
                     }
                     if (cardName.toLowerCase() === 'superv8') {
                         cardName = 'SUPERCARS';
                     }
+                    // El título base es el texto después del span
                     let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
+                    // Eliminar cualquier referencia a fecha en el título
                     let showDate = '';
                     if (cardName === 'Formula E') {
                         showDate = 'Formula E';
                     }
                     let titleParts = [baseTitle, cardName, showDate].filter(Boolean);
+                    // Eliminar repeticiones consecutivas
                     let filteredTitleParts = [];
                     for (let i = 0; i < titleParts.length; i++) {
                         if (i === 0 || titleParts[i].toLowerCase() !== titleParts[i - 1].toLowerCase()) {
@@ -404,7 +437,9 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     }
                     title = filteredTitleParts.join(' - ');
                 }
+                // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
                 let date = '';
+                // Imagen FIJA para todos los eventos de motorsports
                 image = 'https://images.vexels.com/media/users/3/139434/isolated/preview/4bcbe9b4d3e6f6e4c1207c142a98c2d8-carrera-de-coches-de-carreras-de-ferrari.png';
                 const eventObj = {
                     time,
@@ -413,7 +448,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     button: 'WAC',
                     category,
                     language: 'Inglés',
-                    date,
+                    date, // ahora es la fecha legible del evento
                     eventDate: eventDate || '',
                     source: 'wearechecking-motorsports',
                     image,
@@ -427,6 +462,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
             });
         });
         const results = await Promise.all(eventPromises);
+        // Solo eventos con al menos una opción válida
         return results.filter(ev => ev.options && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de WeAreChecking Motorsports:', error);
@@ -457,19 +493,24 @@ async function fetchWeAreCheckingFootballEvents() {
             const $feed = $wrapper.find('.stream-feed');
             const onclick = $feed.attr('onclick');
             if (onclick && onclick.includes("location.href='/streams/")) {
+                // Extraer link
                 const match = onclick.match(/location.href='([^']+)'/);
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
+                // Extraer título y hora
                 const $p = $feed.find('p');
                 let time = '00:00';
                 let date = new Date().toISOString().split('T')[0];
                 let title = $p.text().trim();
+                // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
                     let spanText = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
+                    // Si el texto es un número, es un timestamp y hay que formatearlo
                     if (/^\d{10,}$/.test(spanText)) {
                         const unix = parseInt(spanText);
                         if (!isNaN(unix)) {
                             const eventDate = new Date(unix * 1000);
+                            // Formato: 1 jul, 01:00 a.m.
                             const day = eventDate.getDate();
                             const month = eventDate.toLocaleString('es-ES', { month: 'short' });
                             let hour = eventDate.getHours();
@@ -484,20 +525,23 @@ async function fetchWeAreCheckingFootballEvents() {
                     if (spanText) {
                         time = spanText;
                     }
+                    // El título es el texto después del span
                     title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
                 }
+                // Imagen FIJA para football
                 let image = 'https://static.vecteezy.com/system/resources/previews/012/996/773/non_2x/sport-ball-football-free-png.png';
+                // Promesa para obtener los links reales
                 const eventObj = {
                     time,
                     title,
-                    link,
+                    link, // link a la página del evento
                     button: 'WAC',
                     category: 'Football',
                     language: 'Inglés',
                     date,
                     source: 'wearechecking-football',
                     image,
-                    options: []
+                    options: [] // se llenará luego
                 };
                 const p = fetchWACLinksForEvent(link).then(options => {
                     eventObj.options = options;
@@ -507,6 +551,7 @@ async function fetchWeAreCheckingFootballEvents() {
             }
         });
         const results = await Promise.all(eventPromises);
+        // Solo eventos con al menos una opción válida
         return results.filter(ev => ev.options && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de WeAreChecking Football:', error);
@@ -514,111 +559,96 @@ async function fetchWeAreCheckingFootballEvents() {
     }
 }
 
-
+// --- VipLeague Motorsports ---
 /**
- * NUEVA FUNCIÓN MEJORADA
- * Scrapea eventos y links de transmisión de fbstreams.pm/stream/motorsports
+ * Scrapea eventos de https://vipleague.im/motorsports-schedule-streaming-links y extrae el link de transmisión de cada evento
+ * Recorre los hijos de #v3p2n8d1z2 en orden, asocia la fecha correcta y extrae hora, título y link correctamente.
  */
-async function fetchFBStreamsMotorsportsEvents() {
-    const baseUrl = 'https://fbstreams.pm';
-    const eventsUrl = `${baseUrl}/stream/motorsports`;
-    console.log(`[FBStreams] Iniciando scraping desde: ${eventsUrl}`);
-
+async function fetchVipLeagueMotorsportsEvents() {
     try {
-        // 1. Obtener el HTML de la página principal de motorsports
-        const response = await fetch(eventsUrl, {
+        const url = 'https://vipleague.im/motorsports-schedule-streaming-links';
+        console.log('Fetching VipLeague Motorsports eventos desde', url);
+        const response = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
             timeout: 15000
         });
-        if (!response.ok) {
-            throw new Error(`Error al acceder a la página principal. Estado: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         const html = await response.text();
         const $ = cheerio.load(html);
-
-        const promises = [];
-        let currentDate = new Date().toISOString().split('T')[0]; // Fecha por defecto
-
-        // 2. Iterar sobre TODOS los hijos del contenedor para mantener el orden
-        $('#v8o8c3o7w9').children().each((i, element) => {
-            const $element = $(element);
-
-            // 2.1. Si es un separador de fecha, actualizar la fecha actual
-            if ($element.hasClass('w6x2l5g8n0')) {
-                currentDate = $element.text().trim();
-                console.log(`[FBStreams] Nueva fecha detectada: ${currentDate}`);
-                return; // Continuar con el siguiente elemento
+        const events = [];
+        const eventPromises = [];
+        let currentDate = null;
+        // Recorrer hijos de #v3p2n8d1z2 en orden
+        $('#v3p2n8d1z2').children().each((i, el) => {
+            const $el = $(el);
+            // Si es separador de fecha
+            if ($el.hasClass('f1l1d0t8p4')) {
+                currentDate = $el.text().trim();
+                return;
             }
-
-            // 2.2. Si es un link de evento, procesarlo
-            if ($element.is('a') && $element.hasClass('btn-dark')) {
-                const title = $element.attr('title')?.trim();
-                const eventPagePath = $element.attr('href');
-                const time = $element.find('span.y4v8r4p5o5').text().trim() || 'N/A';
-
-                if (title && eventPagePath) {
-                    const eventPageUrl = `${baseUrl}${eventPagePath}`;
-                    
-                    // 3. Crear una promesa para obtener el iframe de la página del evento
+            // Si es un evento
+            if ($el.is('a.btn-dark')) {
+                let link = $el.attr('href') || '';
+                if (link && !link.startsWith('http')) link = 'https://vipleague.im' + link;
+                let title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
+                // Extraer hora del <span> si existe
+                let time = $el.find('span.n9l5v5r1t3').text().trim();
+                if (!time) time = '00:00';
+                // Limpiar título: quitar el span de la hora del texto
+                if ($el.find('span.n9l5v5r1t3').length > 0) {
+                    const $clone = $el.clone();
+                    $clone.find('span.n9l5v5r1t3').remove();
+                    title = $clone.text().replace(/\s+/g, ' ').trim();
+                }
+                // Promesa: entrar al link del evento y extraer el src del iframe
+                if (link) {
+                    const date = currentDate || new Date().toISOString().split('T')[0];
                     const p = (async () => {
                         try {
-                            console.log(`[FBStreams] Procesando evento: "${title}" en ${eventPageUrl}`);
-                            const subResponse = await fetch(eventPageUrl, {
-                                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-                                timeout: 10000
+                            const subRes = await fetch(link, {
+                                headers: {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                },
+                                timeout: 15000
                             });
-                            if (!subResponse.ok) {
-                                console.error(`[FBStreams] Error al obtener la página del evento ${eventPageUrl}. Estado: ${subResponse.status}`);
-                                return null;
-                            }
-                            const subHtml = await subResponse.text();
-                            const $$ = cheerio.load(subHtml);
-
-                            // 4. Extraer el 'src' del iframe
-                            const iframeSrc = $$('div.ratio.ratio-16x9 iframe').attr('src');
-
+                            if (!subRes.ok) return;
+                            const subHtml = await subRes.text();
+                            const $sub = cheerio.load(subHtml);
+                            // Buscar el iframe de la transmisión
+                            let iframeSrc = $sub('div.ratio iframe').attr('src') || $sub('iframe').attr('src') || '';
+                            if (iframeSrc && iframeSrc.startsWith('/')) iframeSrc = 'https://vipleague.im' + iframeSrc;
                             if (iframeSrc) {
-                                console.log(`[FBStreams] Éxito: Iframe encontrado para "${title}"`);
-                                return {
+                                events.push({
                                     time,
-                                    title,
+                                    title: title || 'Evento VipLeague',
                                     link: iframeSrc,
-                                    button: 'STREAM', // Nombre genérico del botón
+                                    button: 'VIPLEAGUE',
                                     category: 'Motorsports',
-                                    language: 'EN/ES',
-                                    date: currentDate,
-                                    source: 'fbstreams',
-                                    image: 'https://cdn-icons-png.flaticon.com/512/1009/1009821.png' // Icono genérico
-                                };
-                            } else {
-                                console.warn(`[FBStreams] Advertencia: No se encontró iframe para "${title}" en la página ${eventPageUrl}`);
-                                return null;
+                                    language: 'Inglés',
+                                    date,
+                                    source: 'vipleague-motorsports',
+                                    image: 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
+                                    options: [{ name: 'VIPLEAGUE', link: iframeSrc }]
+                                });
                             }
                         } catch (e) {
-                            console.error(`[FBStreams] Error crítico al procesar la página del evento ${eventPageUrl}:`, e.message);
-                            return null;
+                            // Ignorar errores individuales
                         }
                     })();
-                    promises.push(p);
+                    eventPromises.push(p);
                 }
             }
         });
-
-        // 5. Esperar que todas las promesas se resuelvan y filtrar las que fallaron
-        const results = await Promise.all(promises);
-        const validEvents = results.filter(event => event !== null);
-        
-        console.log(`[FBStreams] Scraping finalizado. Se obtuvieron ${validEvents.length} eventos válidos.`);
-        return validEvents;
-
+        await Promise.all(eventPromises);
+        console.log(`VipLeague Motorsports: ${events.length} eventos obtenidos`);
+        return events;
     } catch (error) {
-        console.error('[FBStreams] Fallo general en la función de scraping:', error.message);
-        return []; // Devolver array vacío en caso de error grave
+        console.error('Error al obtener eventos de VipLeague Motorsports:', error);
+        return [];
     }
 }
-
 
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
@@ -638,23 +668,16 @@ export default async (req, res) => {
     try {
         // 1. Obtenemos la lista de canales en memoria
         const canales = await fetchChannelsObject();
-        console.log('Iniciando obtención de eventos de todas las fuentes...');
+        console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [
-            streamTpEvents, 
-            alanGuloEvents, 
-            wacEvents, 
-            wacMotorsportsEvents, 
-            wacFootballEvents,
-            fbStreamsEvents // <--- AÑADIDO
-        ] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, vipLeagueMotorsports] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingEvents(),
             fetchWeAreCheckingMotorsportsEvents(),
             fetchWeAreCheckingFootballEvents(),
-            fetchFBStreamsMotorsportsEvents() // <--- AÑADIDO
+            fetchVipLeagueMotorsportsEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
@@ -662,23 +685,22 @@ export default async (req, res) => {
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const wearecheckingFootballEvents = wacFootballEvents.status === 'fulfilled' ? wacFootballEvents.value : [];
-        const fbEvents = fbStreamsEvents.status === 'fulfilled' ? fbStreamsEvents.value : []; // <--- AÑADIDO
-
+        const vipLeagueEvents = vipLeagueMotorsports.status === 'fulfilled' ? vipLeagueMotorsports.value : [];
+        
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
         if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
-        if (fbStreamsEvents.status === 'rejected') console.error('FBStreams Motorsports falló:', fbStreamsEvents.reason); // <--- AÑADIDO
+        if (vipLeagueMotorsports.status === 'rejected') console.error('VipLeague Motorsports falló:', vipLeagueMotorsports.reason);
 
-        // Unir todos los eventos en un solo array
         const allEvents = [
-            ...streamEvents, 
-            ...alanEvents, 
-            ...wearecheckingEvents, 
-            ...wearecheckingMotorsportsEvents, 
+            ...streamEvents,
+            ...alanEvents,
+            ...wearecheckingEvents,
+            ...wearecheckingMotorsportsEvents,
             ...wearecheckingFootballEvents,
-            ...fbEvents // <--- AÑADIDO
+            ...vipLeagueEvents
         ];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
@@ -687,6 +709,8 @@ export default async (req, res) => {
             return res.status(200).json([]);
         }
         
+        // El resto de la lógica de procesamiento y agrupación de eventos sigue aquí...
+        // (Se ha omitido por brevedad, ya que no cambia)
         const eventMap = new Map();
         allEvents.forEach(event => {
             if (event.title && event.title.toUpperCase().includes('MLB')) {
@@ -767,7 +791,8 @@ export default async (req, res) => {
         });
 
         const adaptedEvents = Array.from(eventMap.values());
-        
+        // ... (resto del código de agrupación sin cambios)
+
         return res.status(200).json(adaptedEvents);
     } catch (error) {
         console.error('Error en la función principal:', error);
