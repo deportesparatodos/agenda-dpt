@@ -362,16 +362,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
             } else if (image && image.startsWith('/')) {
                 image = 'https://wearechecking.online' + image;
             }
-            // Nombre de la categoría/card (ej: indycar)
-            let cardName = '';
-            const wrapperClass = $wrapper.attr('class') || '';
-            const cardMatch = wrapperClass.match(/wrapper-([\w\d]+)/i);
-            if (cardMatch) {
-                cardName = cardMatch[1];
-            } else {
-                cardName = '';
-            }
-            // Nombre legible de la categoría (ej: Indycar)
+            // Nombre de la categoría
             let category = $wrapper.find('.series-title img').attr('alt') || '';
             if (category) {
                 category = category.replace(/^(series-title-)?/i, '').replace(/\.svg$/i, '').replace(/[-_]/g, ' ').trim();
@@ -393,16 +384,58 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 let eventDate = '';
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
-                let spanText = '';
                 if ($span.length) {
-                    // Tomar el texto tal cual del span (ej: "11 jul, 16:30")
-                    spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
-                    eventDate = spanText;
-                    time = spanText;
+                    // Ejemplo: "11 jul, 02:40 a.m. ￨ "
+                    let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                    // Separar fecha y hora
+                    const fechaHoraMatch = spanText.match(/^(\d{1,2} \w{3}), (\d{2}):(\d{2}) ([ap])\.m\./i);
+                    if (fechaHoraMatch) {
+                        eventDate = fechaHoraMatch[1]; // "11 jul"
+                        let hour = parseInt(fechaHoraMatch[2], 10);
+                        const minute = fechaHoraMatch[3];
+                        const ampm = fechaHoraMatch[4].toLowerCase();
+                        if (ampm === 'p' && hour !== 12) hour += 12;
+                        if (ampm === 'a' && hour === 12) hour = 0;
+                        time = `${String(hour).padStart(2, '0')}:${minute}`;
+                    } else {
+                        // Si no matchea, usar todo el span como hora
+                        time = spanText;
+                        // Intentar extraer solo la fecha si es posible
+                        const soloFecha = spanText.match(/^(\d{1,2} \w{3})/i);
+                        if (soloFecha) eventDate = soloFecha[1];
+                    }
+                    // Extraer nombre de la card/categoría desde la clase del wrapper
+                    let cardName = '';
+                    const wrapperClass = $wrapper.attr('class') || '';
+                    const cardMatch = wrapperClass.match(/wrapper-([\w\d]+)/i);
+                    if (cardMatch) {
+                        cardName = cardMatch[1];
+                    } else {
+                        cardName = category || '';
+                    }
+                    // Normalizar nombres especiales
+                    if (cardName.toLowerCase() === 'fe') {
+                        cardName = 'Formula E';
+                    }
+                    if (cardName.toLowerCase() === 'superv8') {
+                        cardName = 'SUPERCARS';
+                    }
                     // El título base es el texto después del span
                     let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
-                    // Formato de título solicitado
-                    title = `${baseTitle} - ${cardName} - ${spanText}`;
+                    // Eliminar cualquier referencia a fecha en el título
+                    let showDate = '';
+                    if (cardName === 'Formula E') {
+                        showDate = 'Formula E';
+                    }
+                    let titleParts = [baseTitle, cardName, showDate].filter(Boolean);
+                    // Eliminar repeticiones consecutivas
+                    let filteredTitleParts = [];
+                    for (let i = 0; i < titleParts.length; i++) {
+                        if (i === 0 || titleParts[i].toLowerCase() !== titleParts[i - 1].toLowerCase()) {
+                            filteredTitleParts.push(titleParts[i]);
+                        }
+                    }
+                    title = filteredTitleParts.join(' - ');
                 }
                 // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
                 let date = '';
@@ -582,8 +615,7 @@ export default async (req, res) => {
             if (event.title && event.title.toUpperCase().includes('MLB')) {
                 event.image = `https://${alanGuloConfig.linkDomain}/mlb`;
             }
-            // Solo ajustar la hora si event.time es solo HH:MM
-            if (event.time && /^\d{1,2}:\d{2}$/.test(event.time.trim())) {
+            if (event.time) {
                 const timeParts = event.time.split(':');
                 if (timeParts.length >= 2) {
                     let hour = parseInt(timeParts[0]);
