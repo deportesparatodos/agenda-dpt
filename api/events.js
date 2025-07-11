@@ -278,7 +278,7 @@ async function fetchWeAreCheckingEvents() {
                 const eventObj = {
                     time,
                     title,
-                    link: link // link a la página del evento
+                    link: link, // link a la página del evento
                     button: 'WAC',
                     category: 'Otros',
                     language: 'Inglés',
