@@ -562,7 +562,7 @@ async function fetchWeAreCheckingFootballEvents() {
 // --- FBStreams Motorsports ---
 /**
  * Scrapea eventos de https://fbstreams.pm/stream/motorsports y extrae el link de transmisión de cada evento
- * Ahora asocia correctamente la fecha a cada evento según el separador anterior.
+ * Recorre los hijos de #v8o8c3o7w9 en orden, asocia la fecha correcta y extrae hora, título y link correctamente.
  */
 async function fetchFBStreamsMotorsportsEvents() {
     try {
@@ -579,19 +579,17 @@ async function fetchFBStreamsMotorsportsEvents() {
         const $ = cheerio.load(html);
         const events = [];
         const eventPromises = [];
-        let currentDate = new Date().toISOString().split('T')[0];
+        let currentDate = null;
         // Recorrer hijos de #v8o8c3o7w9 en orden
         $('#v8o8c3o7w9').children().each((i, el) => {
             const $el = $(el);
             // Si es separador de fecha
             if ($el.hasClass('w6x2l5g8n0')) {
-                const dateText = $el.text().trim();
-                if (/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
-                    currentDate = dateText;
-                }
+                currentDate = $el.text().trim();
+                return;
             }
             // Si es un evento
-            if ($el.is('a.btn.btn-dark')) {
+            if ($el.is('a.btn-dark')) {
                 let link = $el.attr('href') || '';
                 if (link && !link.startsWith('http')) link = 'https://fbstreams.pm' + link;
                 let title = $el.attr('title') || $el.text().replace(/\s+/g, ' ').trim();
@@ -604,7 +602,7 @@ async function fetchFBStreamsMotorsportsEvents() {
                 }
                 // Promesa: entrar al link del evento y extraer el src del iframe
                 if (link) {
-                    const eventDate = currentDate;
+                    const date = currentDate || new Date().toISOString().split('T')[0];
                     const p = (async () => {
                         try {
                             const subRes = await fetch(link, {
@@ -627,7 +625,7 @@ async function fetchFBStreamsMotorsportsEvents() {
                                     button: 'FBSTREAMS',
                                     category: 'Motorsports',
                                     language: 'Inglés',
-                                    date: eventDate,
+                                    date,
                                     source: 'fbstreams-motorsports',
                                     image: 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
                                     options: [{ name: 'FBSTREAMS', link: iframeSrc }]
