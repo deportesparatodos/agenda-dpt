@@ -576,7 +576,6 @@ async function fetchViprowMotorsportsEvents() {
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
-        // Buscar todos los <a> que sean eventos motorsports SOLO dentro del div principal
         const eventPromises = [];
         $("#z4d3u2n5o3 a.btn.btn-primary").each((i, el) => {
             const $a = $(el);
@@ -626,31 +625,36 @@ async function fetchViprowMotorsportsEvents() {
                                 if ($iframe2.length) iframeSrc = $iframe2.attr('src') || '';
                             }
                             if (iframeSrc) {
-                                options.push({ name: 'EMBED', link: iframeSrc });
+                                options.push(iframeSrc);
                             }
                         }
                     } catch (e) {
                         // Si falla, options vacío
                     }
-                    return {
-                        time: time || '00:00',
-                        title: cleanTitle,
-                        link: eventUrl,
-                        button: 'VIPROW',
-                        category,
-                        language: 'Inglés',
-                        date,
-                        eventDate: '',
-                        source: 'viprow-motorsports',
-                        image,
-                        options
-                    };
+                    // Solo devolver si hay al menos un link válido
+                    if (options.length > 0) {
+                        return {
+                            time: time || '00:00',
+                            title: cleanTitle,
+                            options: options, // array de strings
+                            buttons: ['VIPROW'],
+                            category,
+                            language: 'Inglés',
+                            date,
+                            eventDate: '',
+                            source: 'viprow-motorsports',
+                            image
+                        };
+                    } else {
+                        return null;
+                    }
                 })();
                 eventPromises.push(p);
             }
         });
         const results = await Promise.all(eventPromises);
-        return results;
+        // Filtrar solo los eventos válidos
+        return results.filter(ev => ev && Array.isArray(ev.options) && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de VIPRow Motorsports:', error);
         return [];
