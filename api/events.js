@@ -577,6 +577,7 @@ async function fetchViprowMotorsportsEvents() {
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
+        const eventPromises = [];
         // Buscar todos los <a> de eventos en la lista central
         $("#g8v0c6p4z5 a.mb-1.btn.btn-primary").each((i, el) => {
             const $a = $(el);
@@ -595,22 +596,58 @@ async function fetchViprowMotorsportsEvents() {
             let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
             // Categoría por defecto
             let category = 'Motorsports';
-            // Placeholder para options (embed)
-            const options = [{ name: 'VIPRow', link }];
-            events.push({
-                time,
-                title,
-                link,
-                button: 'VIPROW',
-                category,
-                language: 'Inglés',
-                date,
-                source: 'viprow-motorsports',
-                image,
-                options
-            });
+            // Promesa para entrar al link y extraer el embed real
+            const p = (async () => {
+                try {
+                    if (!link) return null;
+                    const subRes = await fetch(link, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        },
+                        timeout: 15000
+                    });
+                    if (!subRes.ok) return null;
+                    const subHtml = await subRes.text();
+                    const $sub = cheerio.load(subHtml);
+                    // Buscar el primer iframe o embed
+                    let realLink = '';
+                    const $iframe = $sub('iframe');
+                    if ($iframe.length > 0) {
+                        realLink = $iframe.first().attr('src') || '';
+                    } else {
+                        // Buscar <embed> si no hay iframe
+                        const $embed = $sub('embed');
+                        if ($embed.length > 0) {
+                            realLink = $embed.first().attr('src') || '';
+                        }
+                    }
+                    // Si el link es relativo, hacerlo absoluto
+                    if (realLink && realLink.startsWith('/')) {
+                        realLink = `https://www.viprow.nu${realLink}`;
+                    }
+                    // Si no se encontró link real, usar el link a la página como fallback
+                    if (!realLink) realLink = link;
+                    return {
+                        time,
+                        title,
+                        link: realLink,
+                        button: 'VIPROW',
+                        category,
+                        language: 'Inglés',
+                        date,
+                        source: 'viprow-motorsports',
+                        image,
+                        options: [{ name: 'VIPROW', link: realLink }]
+                    };
+                } catch (e) {
+                    return null;
+                }
+            })();
+            eventPromises.push(p);
         });
-        return events;
+        const results = await Promise.all(eventPromises);
+        // Solo eventos válidos
+        return results.filter(ev => ev && ev.link);
     } catch (error) {
         console.error('Error al obtener eventos de VIPRow Motorsports:', error);
         return [];
@@ -716,6 +753,9 @@ export default async (req, res) => {
                     optionsArr = [event.link];
                 } else if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports') && Array.isArray(event.options) && event.options.length > 0) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
+                    optionsArr = event.options.map(opt => opt.link);
+                } else if (event.source === 'viprow-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
+                    buttonArr = event.options.map(opt => (opt.name || 'VIPROW').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
                 } else if (event.button) {
                     buttonArr = [event.button];
