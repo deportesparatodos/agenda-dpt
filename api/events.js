@@ -559,6 +559,84 @@ async function fetchWeAreCheckingFootballEvents() {
     }
 }
 
+/**
+ * Scrapea eventos de automovilismo desde viprow.nu
+ */
+async function fetchVipRowEvents() {
+    const url = 'https://www.viprow.nu/sports-motorsports-online';
+    const baseUrl = 'https://www.viprow.nu';
+    console.log(`Fetching VipRow eventos desde ${url}...`);
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            timeout: 15000
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        const events = [];
+
+        $('#z9m5c5w0g8 > a').each((index, element) => {
+            const $el = $(element);
+
+            const title = $el.attr('title').trim();
+            const relativeLink = $el.attr('href');
+            
+            if (!relativeLink) return; // Saltar si no hay link
+            
+            const link = `${baseUrl}${relativeLink}`;
+
+            const timeSpan = $el.find('span.o5f2g8k5k8');
+            let time = '00:00';
+            let eventDay = new Date().toISOString().split('T')[0];
+
+            if (timeSpan.length > 0) {
+                time = timeSpan.text().trim();
+                const contentAttr = timeSpan.attr('content');
+                if (contentAttr) {
+                    try {
+                        const dateFromAttr = new Date(contentAttr);
+                        if (!isNaN(dateFromAttr)) {
+                           eventDay = dateFromAttr.toISOString().split('T')[0];
+                        }
+                    } catch(e) {
+                        console.error("Error parsing date from content attribute", contentAttr);
+                    }
+                }
+            } else {
+                 // Para eventos sin hora (canales 24/7), mantenemos la fecha de hoy y hora 00:00
+            }
+
+            const event = {
+                time: time,
+                title: title,
+                options: [link],
+                buttons: ["VER"],
+                category: "Motorsports",
+                language: "Inglés",
+                date: eventDay,
+                eventDay: eventDay,
+                source: 'viprow',
+                image: 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png'
+            };
+            events.push(event);
+        });
+
+        console.log(`VipRow: ${events.length} eventos obtenidos.`);
+        return events;
+    } catch (error) {
+        console.error('Error al obtener eventos de VipRow:', error);
+        return [];
+    }
+}
+
+
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -580,12 +658,13 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, vipRowEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingEvents(),
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchWeAreCheckingFootballEvents()
+            fetchWeAreCheckingFootballEvents(),
+            fetchVipRowEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
@@ -593,14 +672,16 @@ export default async (req, res) => {
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const wearecheckingFootballEvents = wacFootballEvents.status === 'fulfilled' ? wacFootballEvents.value : [];
+        const viprowEventsResult = vipRowEvents.status === 'fulfilled' ? vipRowEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
         if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
+        if (vipRowEvents.status === 'rejected') console.error('VipRow falló:', vipRowEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents, ...viprowEventsResult];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
@@ -608,8 +689,6 @@ export default async (req, res) => {
             return res.status(200).json([]);
         }
         
-        // El resto de la lógica de procesamiento y agrupación de eventos sigue aquí...
-        // (Se ha omitido por brevedad, ya que no cambia)
         const eventMap = new Map();
         allEvents.forEach(event => {
             if (event.title && event.title.toUpperCase().includes('MLB')) {
@@ -633,7 +712,10 @@ export default async (req, res) => {
                         newHour = hour + 7;
                         if (newHour >= 24) newHour -= 24;
                         event.time = `${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-                    } else {
+                    } else if (event.source === 'viprow') {
+                        // No se necesita ajuste de hora para viprow, ya se extrae correctamente
+                    }
+                    else {
                         event.time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
                     }
                 }
@@ -649,7 +731,11 @@ export default async (req, res) => {
                 } else if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports') && Array.isArray(event.options) && event.options.length > 0) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
-                } else if (event.button) {
+                } else if (event.source === 'viprow') {
+                    buttonArr = event.buttons;
+                    optionsArr = event.options;
+                }
+                else if (event.button) {
                     buttonArr = [event.button];
                     optionsArr = [event.link];
                 } else {
@@ -676,7 +762,13 @@ export default async (req, res) => {
                             existing.buttons.push(opt.name.toUpperCase());
                         }
                     });
-                } else if (event.link && !existing.options.includes(event.link)) {
+                } else if (event.source === 'viprow') {
+                     if (event.options && !existing.options.includes(event.options[0])) {
+                        existing.options.push(...event.options);
+                        existing.buttons.push(...event.buttons);
+                    }
+                }
+                else if (event.link && !existing.options.includes(event.link)) {
                     existing.options.push(event.link);
                     if (event.button) existing.buttons.push(event.button);
                 }
