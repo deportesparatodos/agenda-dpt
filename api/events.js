@@ -559,6 +559,101 @@ async function fetchWeAreCheckingFootballEvents() {
     }
 }
 
+/**
+ * Obtiene eventos en vivo desde la API de streamed.su
+ */
+async function fetchStreamedSuEvents() {
+    try {
+        console.log('Fetching Streamed.su live matches...');
+        // Primero, obtener todos los partidos en vivo
+        const matchesResponse = await fetch('https://streamed.su/api/matches/live', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            timeout: 15000
+        });
+
+        if (!matchesResponse.ok) {
+            throw new Error(`Streamed.su API error for matches: ${matchesResponse.status}`);
+        }
+
+        const matches = await matchesResponse.json();
+        if (!Array.isArray(matches)) {
+            console.error('Streamed.su: La respuesta de partidos no es un array.');
+            return [];
+        }
+        console.log(`Streamed.su: ${matches.length} partidos encontrados.`);
+
+        // Procesar cada partido para obtener sus streams y formatearlo
+        const eventPromises = matches.map(async (match) => {
+            try {
+                if (!match.sources || match.sources.length === 0) {
+                    return null; // Omitir partidos sin fuentes de stream
+                }
+
+                // Obtener todas las fuentes de stream para este partido en paralelo
+                const streamSourcesPromises = match.sources.map(source =>
+                    fetch(`https://streamed.su/api/stream/${source.source}/${source.id}`, {
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+                        timeout: 10000
+                    })
+                    .then(res => {
+                        if (res.ok) return res.json();
+                        // Registrar error pero no lanzar excepción para no fallar todo el Promise.all
+                        console.error(`Fallo al obtener stream: ${source.source}/${source.id}, Estado: ${res.status}`);
+                        return [];
+                    })
+                    .catch(err => {
+                         console.error(`Error obteniendo stream ${source.source}/${source.id}:`, err.message);
+                         return []; // Si la obtención de una fuente falla, devolver un array vacío
+                    })
+                );
+
+                const streamSourcesArrays = await Promise.all(streamSourcesPromises);
+                const allStreams = streamSourcesArrays.flat().filter(s => s && s.embedUrl); // Aplanar y asegurar que el stream sea válido
+
+                if (allStreams.length === 0) {
+                    return null; // No se encontraron streams visibles para este partido
+                }
+
+                // Adaptar a la estructura de eventos de la aplicación
+                const eventDate = new Date(match.date);
+                
+                // Construir URL de la imagen. La API devuelve rutas relativas.
+                let imageUrl = '';
+                const baseUrl = 'https://streamed.su';
+                if (match.poster) {
+                    imageUrl = new URL(match.poster, baseUrl).href;
+                } else if (match.teams?.home?.badge) {
+                    imageUrl = new URL(match.teams.home.badge, baseUrl).href;
+                }
+
+                return {
+                    time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
+                    title: match.title,
+                    options: allStreams.map(stream => stream.embedUrl),
+                    buttons: allStreams.map(stream => `${stream.language || 'Stream'} ${stream.hd ? 'HD' : ''}`.trim()),
+                    category: match.category,
+                    language: [...new Set(allStreams.map(s => s.language).filter(Boolean))].join(', ') || 'N/A',
+                    date: eventDate.toISOString().split('T')[0],
+                    source: 'streamedsu',
+                    image: imageUrl,
+                };
+            } catch (error) {
+                console.error(`Error procesando partido de Streamed.su "${match.title}":`, error);
+                return null; // Devolver null si hay un error procesando un solo partido
+            }
+        });
+
+        const events = (await Promise.all(eventPromises)).filter(Boolean); // Filtrar nulos
+        console.log(`Streamed.su: ${events.length} eventos procesados exitosamente.`);
+        return events;
+
+    } catch (error) {
+        console.error('Error al obtener eventos de Streamed.su:', error.message);
+        return []; // Devolver array vacío en caso de fallo principal
+    }
+}
+
+
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -580,12 +675,13 @@ export default async (req, res) => {
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         
-        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, streamedSuEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingEvents(),
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchWeAreCheckingFootballEvents()
+            fetchWeAreCheckingFootballEvents(),
+            fetchStreamedSuEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
@@ -593,14 +689,16 @@ export default async (req, res) => {
         const wearecheckingEvents = wacEvents.status === 'fulfilled' ? wacEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const wearecheckingFootballEvents = wacFootballEvents.status === 'fulfilled' ? wacFootballEvents.value : [];
+        const newStreamedSuEvents = streamedSuEvents.status === 'fulfilled' ? streamedSuEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacEvents.status === 'rejected') console.error('WeAreChecking falló:', wacEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
         if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
+        if (streamedSuEvents.status === 'rejected') console.error('Streamed.su falló:', streamedSuEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents, ...newStreamedSuEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
@@ -608,10 +706,10 @@ export default async (req, res) => {
             return res.status(200).json([]);
         }
         
-        // El resto de la lógica de procesamiento y agrupación de eventos sigue aquí...
-        // (Se ha omitido por brevedad, ya que no cambia)
         const eventMap = new Map();
         allEvents.forEach(event => {
+            if (!event || !event.title) return; // Omitir eventos inválidos
+
             if (event.title && event.title.toUpperCase().includes('MLB')) {
                 event.image = `https://${alanGuloConfig.linkDomain}/mlb`;
             }
@@ -649,6 +747,9 @@ export default async (req, res) => {
                 } else if ((event.source === 'wearechecking' || event.source === 'wearechecking-football' || event.source === 'wearechecking-motorsports') && Array.isArray(event.options) && event.options.length > 0) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
+                } else if (event.source === 'streamedsu' && Array.isArray(event.options)) {
+                    buttonArr = event.buttons;
+                    optionsArr = event.options;
                 } else if (event.button) {
                     buttonArr = [event.button];
                     optionsArr = [event.link];
@@ -690,8 +791,7 @@ export default async (req, res) => {
         });
 
         const adaptedEvents = Array.from(eventMap.values());
-        // ... (resto del código de agrupación sin cambios)
-
+        
         return res.status(200).json(adaptedEvents);
     } catch (error) {
         console.error('Error en la función principal:', error);
