@@ -361,41 +361,6 @@
             return buenosAiresTime;
         }
 
-        // Función para determinar el estado del evento en el frontend
-        function determineEventStatus(eventTime, eventDate) {
-            try {
-                if (!eventTime || eventTime === '00:00') return 'Próximo';
-
-                // Obtener la hora actual de Buenos Aires
-                const nowBuenosAires = getBuenosAiresTime();
-                
-                // Usar la fecha del evento si está disponible, si no, usar hoy
-                let baseDate = eventDate || new Date().toISOString().split('T')[0];
-                
-                // Crear la fecha del evento en Buenos Aires
-                const [year, month, day] = baseDate.split('-').map(Number);
-                const [eventHour, eventMinute] = eventTime.split(':').map(Number);
-                
-                if (isNaN(eventHour) || isNaN(eventMinute)) return 'Próximo';
-
-                // Crear objeto Date para el inicio del evento en Buenos Aires
-                const eventStart = new Date(year, month - 1, day, eventHour, eventMinute, 0, 0);
-                // Crear objeto Date para el final (3h después)
-                const eventEnd = new Date(eventStart.getTime() + (180 * 60 * 1000));
-
-                if (nowBuenosAires >= eventStart && nowBuenosAires < eventEnd) {
-                    return 'En vivo';
-                } else if (nowBuenosAires < eventStart) {
-                    return 'Próximo';
-                } else {
-                    return 'Finalizado';
-                }
-            } catch (error) {
-                console.error('Error al determinar estado del evento:', error);
-                return 'Próximo';
-            }
-        }
-
         function copyToClipboard(text, button) {
             navigator.clipboard.writeText(text)
                 .then(() => {
@@ -430,23 +395,12 @@
         }
 
         function createEventCard(event, idx) {
-            // Calcular estado en frontend usando la hora de Buenos Aires
-            const status = determineEventStatus(event.time, event.date);
-            let statusHtml = '';
-            if (status === 'En vivo') {
-                statusHtml = '<span class="ml-2 px-2 py-1 rounded text-xs font-bold status-live">EN VIVO</span>';
-            } else if (status === 'Próximo') {
-                statusHtml = '<span class="ml-2 px-2 py-1 rounded text-xs font-bold status-upcoming">PRÓXIMO</span>';
-            } else if (status === 'Finalizado') {
-                statusHtml = '<span class="ml-2 px-2 py-1 rounded text-xs font-bold status-finished">FINALIZADO</span>';
-            }
             return `
                 <div class="event-card rounded-lg p-4">
                     <div class="flex flex-col space-y-4">
                         <div>
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="text-sm text-gray-300">${event.time}</span>
-                                ${statusHtml}
                             </div>
                             ${event.image ? `<img src="${event.image}" alt="Imagen del evento" class="w-full max-h-40 object-contain rounded mb-2">` : ''}
                             <h2 class="text-xl font-semibold text-white">${event.title}</h2>
@@ -475,21 +429,12 @@
                 event.title.toLowerCase().includes(searchTerm)
             );
 
-            // Calcular estado y separar eventos
-            const enVivo = [], proximo = [], finalizado = [];
-            filteredEvents.forEach(event => {
-                const status = determineEventStatus(event.time, event.date);
-                if (status === 'En vivo') enVivo.push(event);
-                else if (status === 'Próximo') proximo.push(event);
-                else finalizado.push(event);
-            });
-            // Quitar prefijo del título (todo hasta el primer ': ')
+            // Ordenar por hora y título ignorando prefijos
             function quitarPrefijoTitulo(titulo) {
                 if (!titulo) return '';
                 const partes = titulo.split(': ');
                 return partes.length > 1 ? partes.slice(1).join(': ').trim() : titulo.trim();
             }
-            // Ordenar cada grupo por hora y título ignorando prefijos
             function sortByTimeAndTitle(a, b) {
                 const [hourA, minuteA] = a.time.split(':').map(Number);
                 const [hourB, minuteB] = b.time.split(':').map(Number);
@@ -502,15 +447,11 @@
                 const tituloB = quitarPrefijoTitulo(b.title).toLowerCase();
                 return tituloA.localeCompare(tituloB, 'es');
             }
-            enVivo.sort(sortByTimeAndTitle);
-            proximo.sort(sortByTimeAndTitle);
-            finalizado.sort(sortByTimeAndTitle);
-
-            const ordered = [...enVivo, ...proximo, ...finalizado];
+            filteredEvents.sort(sortByTimeAndTitle);
 
             document.getElementById('events-container').innerHTML = 
-                ordered.length > 0 
-                    ? ordered.map((event, idx) => createEventCard(event, idx)).join('')
+                filteredEvents.length > 0 
+                    ? filteredEvents.map((event, idx) => createEventCard(event, idx)).join('')
                     : '<p class="text-center text-gray-400">No se encontraron eventos</p>';
         }
 
