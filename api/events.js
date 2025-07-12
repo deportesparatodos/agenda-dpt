@@ -560,7 +560,7 @@ async function fetchWeAreCheckingFootballEvents() {
 }
 
 /**
- * Scrapea eventos de automovilismo desde viprow.nu y extrae el iframe de cada uno.
+ * Scrapea eventos de automovilismo desde viprow.nu
  */
 async function fetchVipRowEvents() {
     const url = 'https://www.viprow.nu/sports-motorsports-online';
@@ -580,16 +580,17 @@ async function fetchVipRowEvents() {
 
         const html = await response.text();
         const $ = cheerio.load(html);
-        const eventPromises = [];
+        const events = [];
 
         $('#z9m5c5w0g8 > a').each((index, element) => {
             const $el = $(element);
+
             const title = $el.attr('title').trim();
             const relativeLink = $el.attr('href');
             
-            if (!relativeLink) return;
+            if (!relativeLink) return; // Saltar si no hay link
             
-            const pageLink = `${baseUrl}${relativeLink}`;
+            const link = `${baseUrl}${relativeLink}`;
 
             const timeSpan = $el.find('span.o5f2g8k5k8');
             let time = '00:00';
@@ -608,50 +609,26 @@ async function fetchVipRowEvents() {
                         console.error("Error parsing date from content attribute", contentAttr);
                     }
                 }
+            } else {
+                 // Para eventos sin hora (canales 24/7), mantenemos la fecha de hoy y hora 00:00
             }
 
-            const promise = (async () => {
-                try {
-                    const pageResponse = await fetch(pageLink, {
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        },
-                        timeout: 15000
-                    });
-                    if (!pageResponse.ok) return null;
-
-                    const pageHtml = await pageResponse.text();
-                    const $page = cheerio.load(pageHtml);
-                    
-                    const iframeSrc = $page('.ratio.ratio-16x9 iframe').attr('src');
-
-                    if (iframeSrc) {
-                        return {
-                            time: time,
-                            title: title,
-                            options: [iframeSrc],
-                            buttons: ["VER"],
-                            category: "Motorsports",
-                            language: "Inglés",
-                            date: eventDay,
-                            eventDay: eventDay,
-                            source: 'viprow',
-                            image: 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png'
-                        };
-                    }
-                    return null;
-                } catch (error) {
-                    console.error(`Error fetching embed for ${title}:`, error);
-                    return null;
-                }
-            })();
-            eventPromises.push(promise);
+            const event = {
+                time: time,
+                title: title,
+                options: [link],
+                buttons: ["VER"],
+                category: "Motorsports",
+                language: "Inglés",
+                date: eventDay,
+                eventDay: eventDay,
+                source: 'viprow',
+                image: 'https://images.vexels.com/media/users/3/139441/isolated/preview/b779109e8e69df289e6629fc7a72f0ee-race-car-racing-side-view.png'
+            };
+            events.push(event);
         });
 
-        const resolvedEvents = await Promise.all(eventPromises);
-        const events = resolvedEvents.filter(event => event !== null);
-
-        console.log(`VipRow: ${events.length} eventos procesados con embed links.`);
+        console.log(`VipRow: ${events.length} eventos obtenidos.`);
         return events;
     } catch (error) {
         console.error('Error al obtener eventos de VipRow:', error);
