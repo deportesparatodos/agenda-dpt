@@ -526,17 +526,9 @@ async function fetchStreamedSuEvents(sportsMap) {
                 const eventDate = new Date(match.date);
                 
                 // Determinar el estado del partido
-                let status = '';
-                if (liveMatchIds.has(match.id)) {
-                    status = 'En vivo';
-                } else {
-                    const now = new Date();
-                    if (eventDate > now) {
-                        status = 'Próximo';
-                    } else {
-                        status = 'Finalizado';
-                    }
-                }
+                const isLive = liveMatchIds.has(match.id);
+                const status = isLive ? 'En vivo' : 'Desconocido';
+                const time = isLive ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
 
                 // Lógica de búsqueda de imágenes mejorada para streamed.su
                 let imageUrl = '';
@@ -550,17 +542,26 @@ async function fetchStreamedSuEvents(sportsMap) {
                     imageUrl = `https://streamed.su/api/images/badge/${match.teams.away.badge}.webp`;
                 }
 
+                // Generar nombres de botones más descriptivos
+                const buttons = allStreams.map(stream => {
+                    let name = (stream.language || `Stream ${stream.streamNo}`).trim();
+                    if (stream.hd) {
+                        name += ' HD';
+                    }
+                    return name;
+                });
+
                 return {
-                    time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
+                    time: time,
                     title: match.title,
                     options: allStreams.map(stream => stream.embedUrl),
-                    buttons: allStreams.map(stream => `${stream.language || 'Stream'} ${stream.hd ? 'HD' : ''}`.trim()),
+                    buttons: buttons,
                     category: sportsMap.get(match.category) || 'Otros',
                     language: [...new Set(allStreams.map(s => s.language).filter(Boolean))].join(', ') || 'N/A',
                     date: eventDate.toISOString().split('T')[0],
                     source: 'streamedsu',
                     image: imageUrl,
-                    status: status, // Añadir el estado
+                    status: status,
                 };
             } catch (error) {
                 console.error(`Error procesando partido de Streamed.su "${match.title}":`, error);
@@ -635,7 +636,6 @@ export default async (req, res) => {
         allEvents.forEach(event => {
             if (!event || !event.title) return;
 
-            // Lógica de asignación de imágenes
             if (event.source !== 'streamedsu') {
                 event.image = DEFAULT_IMAGE;
             }
@@ -668,7 +668,6 @@ export default async (req, res) => {
                     category: event.category || 'Otros',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
-                    eventDay: event.date || new Date().toISOString().split('T')[0],
                     source: event.source || 'unknown',
                     image: event.image || '',
                     status: event.status || 'Desconocido'
