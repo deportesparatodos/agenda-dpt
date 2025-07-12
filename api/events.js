@@ -615,9 +615,11 @@ export default async (req, res) => {
         allEvents.forEach(event => {
             if (!event || !event.title) return;
 
-            if (event.title && event.title.toUpperCase().includes('MLB')) {
-                event.image = `https://${alanGuloConfig.linkDomain}/mlb`;
+            // Lógica de asignación de imágenes
+            if (event.source !== 'streamedsu') {
+                event.image = DEFAULT_IMAGE; // Forzar imagen por defecto para todas las fuentes que no sean streamed.su
             }
+
             if (event.time) {
                 const timeParts = event.time.split(':');
                 if (timeParts.length >= 2) {
@@ -671,7 +673,7 @@ export default async (req, res) => {
                     date: event.date || new Date().toISOString().split('T')[0],
                     eventDay: event.date || new Date().toISOString().split('T')[0],
                     source: event.source || 'unknown',
-                    image: event.image || ''
+                    image: event.image || '' // Usar la imagen ya procesada
                 });
             } else {
                 const existing = eventMap.get(key);
@@ -686,18 +688,12 @@ export default async (req, res) => {
                     existing.options.push(event.link);
                     if (event.button) existing.buttons.push(event.button);
                 }
-                if (event.source === 'alangulotv' && event.image) {
-                    existing.image = event.image;
-                }
-                if (!existing.image && event.image) {
-                    existing.image = event.image;
-                }
             }
         });
 
         let adaptedEvents = Array.from(eventMap.values());
         
-        // Asignar imagen por defecto a eventos sin imagen
+        // Asignar imagen por defecto a eventos (de streamed.su) que no tengan una
         adaptedEvents = adaptedEvents.map(event => {
             if (!event.image) {
                 event.image = DEFAULT_IMAGE;
