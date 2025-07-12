@@ -2,76 +2,8 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
-import puppeteer from 'puppeteer';
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
-let browser; // Variable global para mantener una única instancia del navegador
-
-/**
- * Inicia una instancia de Puppeteer. Se reutilizará para todas las búsquedas de imágenes.
- */
-async function initializeBrowser() {
-    if (!browser) {
-        console.log('[PUPPETEER] Iniciando navegador para búsqueda de imágenes...');
-        browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'] // Argumentos comunes para entornos de servidor
-        });
-        console.log('[PUPPETEER] Navegador iniciado.');
-    }
-}
-
-/**
- * Cierra la instancia global del navegador Puppeteer.
- */
-async function closeBrowser() {
-    if (browser) {
-        await browser.close();
-        browser = null;
-        console.log('[PUPPETEER] Navegador cerrado.');
-    }
-}
-
-/**
- * Usa Puppeteer para buscar en Google Images y devolver la URL de la primera imagen.
- * @param {string} query - El título del evento a buscar.
- * @returns {string|null} - La URL de la imagen o null si no se encuentra.
- */
-async function findEventImageWithPuppeteer(query) {
-    if (!browser) {
-        console.error('[PUPPETEER] El navegador no está inicializado.');
-        return null;
-    }
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
-    
-    try {
-        // Ir a Google Images
-        const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=isch`;
-        await page.goto(url, { waitUntil: 'networkidle2' });
-
-        // Extraer la URL de la primera imagen del resultado
-        const imageUrl = await page.evaluate(() => {
-            const firstImage = document.querySelector('img.DS1iW'); // Selector común para la primera imagen
-            return firstImage ? firstImage.src : null;
-        });
-        
-        await page.close();
-        
-        // Las imágenes de Google a veces son base64, nos aseguramos de que sea una URL http
-        if (imageUrl && imageUrl.startsWith('http')) {
-            console.log(`[PUPPETEER] Imagen encontrada para "${query}": ${imageUrl}`);
-            return imageUrl;
-        }
-        return null;
-
-    } catch (error) {
-        console.error(`[PUPPETEER] Error buscando imagen para "${query}":`, error.message);
-        await page.close();
-        return null;
-    }
-}
-
 
 /**
  * PRIMER PASO: Scrapea y devuelve la lista de canales desde la web (en memoria, no guarda archivo).
@@ -658,8 +590,6 @@ export default async (req, res) => {
     }
 
     try {
-        await initializeBrowser(); // Iniciar el navegador al principio de la solicitud
-
         const canales = await fetchChannelsObject();
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
@@ -688,30 +618,21 @@ export default async (req, res) => {
         if (wacFootballEvents.status === 'rejected') console.error('WeAreChecking Football falló:', wacFootballEvents.reason);
         if (streamedSuEvents.status === 'rejected') console.error('Streamed.su falló:', streamedSuEvents.reason);
 
-        let allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents, ...newStreamedSuEvents];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingEvents, ...wearecheckingMotorsportsEvents, ...wearecheckingFootballEvents, ...newStreamedSuEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
             console.warn('No se obtuvieron eventos de ninguna fuente');
             return res.status(200).json([]);
         }
-
-        // Búsqueda de imágenes para eventos sin una
-        const imageSearchPromises = allEvents.map(async (event) => {
-            if (!event.image) { // Si el evento no tiene imagen (ni de streamed.su ni de otra fuente)
-                const foundImage = await findEventImageWithPuppeteer(event.title);
-                if (foundImage) {
-                    event.image = foundImage;
-                }
-            }
-            return event;
-        });
-
-        allEvents = await Promise.all(imageSearchPromises);
         
         const eventMap = new Map();
         allEvents.forEach(event => {
             if (!event || !event.title) return;
+
+            if (event.source !== 'streamedsu') {
+                event.image = DEFAULT_IMAGE;
+            }
 
             const key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
             if (!eventMap.has(key)) {
@@ -774,7 +695,5 @@ export default async (req, res) => {
     } catch (error) {
         console.error('Error en la función principal:', error);
         return res.status(500).json({ error: 'Error interno del servidor' });
-    } finally {
-        await closeBrowser(); // Asegurarse de cerrar el navegador al final
     }
 };
