@@ -525,26 +525,20 @@ async function fetchStreamedSuEvents(sportsMap) {
 
                 const eventDate = new Date(match.date);
                 
-                // Determinar el estado del partido
                 const isLive = liveMatchIds.has(match.id);
                 const status = isLive ? 'En vivo' : 'Desconocido';
                 const time = isLive ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
 
-                // Lógica de búsqueda de imágenes mejorada para streamed.su
+                // Lógica de imágenes con la prioridad correcta
                 let imageUrl = '';
-                if (match.poster) {
-                    imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
-                } else if (match.teams?.home?.badge && match.teams?.away?.badge) {
+                if (match.teams?.home?.badge && match.teams?.away?.badge) {
                     imageUrl = `https://streamed.su/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
-                } else if (match.teams?.home?.badge) {
-                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.home.badge}.webp`;
-                } else if (match.teams?.away?.badge) {
-                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.away.badge}.webp`;
+                } else if (match.poster) {
+                    imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
                 }
 
-                // Generar nombres de botones más descriptivos
                 const buttons = allStreams.map(stream => {
-                    let name = (stream.language || `Stream ${stream.streamNo}`).trim();
+                    let name = (stream.language || `Stream ${stream.streamNo}`).toUpperCase().trim();
                     if (stream.hd) {
                         name += ' HD';
                     }
