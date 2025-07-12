@@ -3,6 +3,8 @@ import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
 
+const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
+
 /**
  * PRIMER PASO: Scrapea y devuelve la lista de canales desde la web (en memoria, no guarda archivo).
  */
@@ -90,7 +92,8 @@ async function fetchStreamTpGlobalEvents() {
         
         return events.map(event => ({
             ...event,
-            source: 'streamtpglobal'
+            source: 'streamtpglobal',
+            category: 'Otros'
         }));
     } catch (error) {
         console.error('Error al obtener eventos de StreamTpGlobal:', error);
@@ -100,11 +103,8 @@ async function fetchStreamTpGlobalEvents() {
 
 /**
  * Función para hacer scraping de alangulotv usando Cheerio
- * ACTUALIZADA JULIO 2025: scrapea https://alangulotv.me/agenda-2/ y para cada botón entra a su link,
- * extrae el objeto channels y busca la key correspondiente para obtener el link real.
  */
 async function fetchAlanGuloTVEvents(config) {
-    // Usar la nueva URL fija
     const agendaUrl = 'https://alangulotv.me/agenda-2/';
     const linkDomain = 'p.alangulotv.space';
     try {
@@ -143,15 +143,11 @@ async function fetchAlanGuloTVEvents(config) {
                     $linksContainer.find('.link-button, a').each((i, linkEl) => {
                         const $link = $(linkEl);
                         const href = $link.attr('href');
-                        // Usar el nombre del botón de la agenda principal, no el de la subpágina
                         const buttonName = $link.text().trim() || 'CANAL';
                         if (href) {
-                            // Construir URL absoluta si es relativa
                             let eventPageUrl = href.startsWith('http') ? href : `https://alangulotv.me${href}`;
-                            // Extraer la key de canal de la URL
                             const pathParts = href.split('/').filter(part => part.length > 0);
                             const linkKey = pathParts[pathParts.length - 1];
-                            // Promesa: entrar a la página del botón, extraer channels y buscar la key
                             const p = (async () => {
                                 try {
                                     const subRes = await fetch(eventPageUrl, {
@@ -162,7 +158,6 @@ async function fetchAlanGuloTVEvents(config) {
                                     });
                                     if (!subRes.ok) return;
                                     const subHtml = await subRes.text();
-                                    // Buscar el objeto channels en el <script>
                                     const channelsMatch = subHtml.match(/const\s+channels\s*=\s*(\{[\s\S]*?\});/);
                                     if (channelsMatch && channelsMatch[1]) {
                                         let channelsObj;
@@ -171,7 +166,6 @@ async function fetchAlanGuloTVEvents(config) {
                                         } catch (e) {
                                             return;
                                         }
-                                        // Buscar la key
                                         if (channelsObj[linkKey]) {
                                             const channelData = channelsObj[linkKey];
                                             const firstAvailableKey = Object.keys(channelData)[0];
@@ -182,8 +176,8 @@ async function fetchAlanGuloTVEvents(config) {
                                                         time,
                                                         title,
                                                         link: finalLink,
-                                                        button: buttonName, // nombre del botón de la agenda principal
-                                                        category: 'Deportes',
+                                                        button: buttonName,
+                                                        category: 'Otros',
                                                         language: 'Español',
                                                         date: new Date().toISOString().split('T')[0],
                                                         source: 'alangulotv',
@@ -194,7 +188,7 @@ async function fetchAlanGuloTVEvents(config) {
                                         }
                                     }
                                 } catch (e) {
-                                    // Ignorar errores de fetch individuales
+                                    // Ignorar errores
                                 }
                             })();
                             eventPromises.push(p);
@@ -237,24 +231,19 @@ async function fetchWeAreCheckingEvents() {
             const $feed = $wrapper.find('.stream-feed');
             const onclick = $feed.attr('onclick');
             if (onclick && onclick.includes("location.href='/streams/")) {
-                // Extraer link
                 const match = onclick.match(/location.href='([^']+)'/);
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
-                // Extraer título y hora
                 const $p = $feed.find('p');
                 let time = '00:00';
                 let date = new Date().toISOString().split('T')[0];
                 let title = $p.text().trim();
-                // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
                     let spanText = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
-                    // Si el texto es un número, es un timestamp y hay que formatearlo
                     if (/^\d{10,}$/.test(spanText)) {
                         const unix = parseInt(spanText);
                         if (!isNaN(unix)) {
                             const eventDate = new Date(unix * 1000);
-                            // Formato: 1 jul, 01:00 a.m.
                             const day = eventDate.getDate();
                             const month = eventDate.toLocaleString('es-ES', { month: 'short' });
                             let hour = eventDate.getHours();
@@ -266,26 +255,20 @@ async function fetchWeAreCheckingEvents() {
                             spanText = `${day} ${month}, ${hour}:${minuteStr} ${ampm}`;
                         }
                     }
-                    if (spanText) {
-                        time = spanText;
-                    }
-                    // El título es el texto después del span
+                    if (spanText) time = spanText;
                     title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
                 }
-                // Imagen FIJA para others
-                let image = 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png';
-                // Promesa para obtener los links reales
                 const eventObj = {
                     time,
                     title,
-                    link, // link a la página del evento
+                    link,
                     button: 'WAC',
                     category: 'Otros',
                     language: 'Inglés',
                     date,
                     source: 'wearechecking',
-                    image,
-                    options: [] // se llenará luego
+                    image: 'https://cdn-icons-png.flaticon.com/512/9192/9192710.png',
+                    options: []
                 };
                 const p = fetchWACLinksForEvent(link).then(options => {
                     eventObj.options = options;
@@ -295,7 +278,6 @@ async function fetchWeAreCheckingEvents() {
             }
         });
         const results = await Promise.all(eventPromises);
-        // Solo eventos con al menos una opción válida
         return results.filter(ev => ev.options && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de WeAreChecking:', error);
@@ -352,104 +334,32 @@ async function fetchWeAreCheckingMotorsportsEvents() {
         const $ = cheerio.load(html);
         const events = [];
         const eventPromises = [];
-        // Recorrer todos los stream-wrapper de motorsports
         $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
             const $wrapper = $(el);
-            // Imagen de la categoría
-            let image = $wrapper.find('.stream-thumb').attr('src') || '';
-            if (image && image.startsWith('..')) {
-                image = 'https://wearechecking.online/' + image.replace(/^\.\./, '').replace(/^\//, '');
-            } else if (image && image.startsWith('/')) {
-                image = 'https://wearechecking.online' + image;
-            }
-            // Nombre de la categoría
-            let category = $wrapper.find('.series-title img').attr('alt') || '';
-            if (category) {
-                category = category.replace(/^(series-title-)?/i, '').replace(/\.svg$/i, '').replace(/[-_]/g, ' ').trim();
-                category = category.charAt(0).toUpperCase() + category.slice(1);
-            } else {
-                category = 'Motorsports';
-            }
-            // Recorrer todos los .stream-feed con onclick (eventos reales)
+            let image = 'https://images.vexels.com/media/users/3/139434/isolated/preview/4bcbe9b4d3e6f6e4c1207c142a98c2d8-carrera-de-coches-de-carreras-de-ferrari.png';
             $wrapper.find('.stream-feed[onclick]').each((j, feedEl) => {
                 const $feed = $(feedEl);
                 const onclick = $feed.attr('onclick');
                 const match = onclick ? onclick.match(/location.href='([^']+)'/) : null;
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
                 const $p = $feed.find('p');
-                // Si no hay <p> o dice "No events", saltar
                 if ($p.length === 0 || /No events/i.test($p.text())) return;
-                // Extraer hora y fecha desde el span
                 let time = '00:00';
-                let eventDate = '';
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                    // Ejemplo: "11 jul, 02:40 a.m. ￨ "
-                    let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
-                    // Separar fecha y hora
-                    const fechaHoraMatch = spanText.match(/^(\d{1,2} \w{3}), (\d{2}):(\d{2}) ([ap])\.m\./i);
-                    if (fechaHoraMatch) {
-                        eventDate = fechaHoraMatch[1]; // "11 jul"
-                        let hour = parseInt(fechaHoraMatch[2], 10);
-                        const minute = fechaHoraMatch[3];
-                        const ampm = fechaHoraMatch[4].toLowerCase();
-                        if (ampm === 'p' && hour !== 12) hour += 12;
-                        if (ampm === 'a' && hour === 12) hour = 0;
-                        time = `${String(hour).padStart(2, '0')}:${minute}`;
-                    } else {
-                        // Si no matchea, usar todo el span como hora
-                        time = spanText;
-                        // Intentar extraer solo la fecha si es posible
-                        const soloFecha = spanText.match(/^(\d{1,2} \w{3})/i);
-                        if (soloFecha) eventDate = soloFecha[1];
-                    }
-                    // Extraer nombre de la card/categoría desde la clase del wrapper
-                    let cardName = '';
-                    const wrapperClass = $wrapper.attr('class') || '';
-                    const cardMatch = wrapperClass.match(/wrapper-([\w\d]+)/i);
-                    if (cardMatch) {
-                        cardName = cardMatch[1];
-                    } else {
-                        cardName = category || '';
-                    }
-                    // Normalizar nombres especiales
-                    if (cardName.toLowerCase() === 'fe') {
-                        cardName = 'Formula E';
-                    }
-                    if (cardName.toLowerCase() === 'superv8') {
-                        cardName = 'SUPERCARS';
-                    }
-                    // El título base es el texto después del span
-                    let baseTitle = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
-                    // Eliminar cualquier referencia a fecha en el título
-                    let showDate = '';
-                    if (cardName === 'Formula E') {
-                        showDate = 'Formula E';
-                    }
-                    let titleParts = [baseTitle, cardName, showDate].filter(Boolean);
-                    // Eliminar repeticiones consecutivas
-                    let filteredTitleParts = [];
-                    for (let i = 0; i < titleParts.length; i++) {
-                        if (i === 0 || titleParts[i].toLowerCase() !== titleParts[i - 1].toLowerCase()) {
-                            filteredTitleParts.push(titleParts[i]);
-                        }
-                    }
-                    title = filteredTitleParts.join(' - ');
+                     let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                     time = spanText;
+                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                 }
-                // Asignar la fecha legible como eventDate y también como date (para que la app lo use como día del evento)
-                let date = '';
-                // Imagen FIJA para todos los eventos de motorsports
-                image = 'https://images.vexels.com/media/users/3/139434/isolated/preview/4bcbe9b4d3e6f6e4c1207c142a98c2d8-carrera-de-coches-de-carreras-de-ferrari.png';
                 const eventObj = {
                     time,
                     title,
                     link,
                     button: 'WAC',
-                    category,
+                    category: 'Motor Sports',
                     language: 'Inglés',
-                    date, // ahora es la fecha legible del evento
-                    eventDate: eventDate || '',
+                    date: new Date().toISOString().split('T')[0],
                     source: 'wearechecking-motorsports',
                     image,
                     options: []
@@ -462,7 +372,6 @@ async function fetchWeAreCheckingMotorsportsEvents() {
             });
         });
         const results = await Promise.all(eventPromises);
-        // Solo eventos con al menos una opción válida
         return results.filter(ev => ev.options && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de WeAreChecking Motorsports:', error);
@@ -493,24 +402,19 @@ async function fetchWeAreCheckingFootballEvents() {
             const $feed = $wrapper.find('.stream-feed');
             const onclick = $feed.attr('onclick');
             if (onclick && onclick.includes("location.href='/streams/")) {
-                // Extraer link
                 const match = onclick.match(/location.href='([^']+)'/);
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
-                // Extraer título y hora
                 const $p = $feed.find('p');
                 let time = '00:00';
                 let date = new Date().toISOString().split('T')[0];
                 let title = $p.text().trim();
-                // Si hay unix-timestamp, usar el texto visible del span como hora
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
                     let spanText = $span.text().replace(/\u200a|\u200b|\u200c|\u200d|\uFEFF/g, '').replace(/\s*\|\s*$/, '').trim();
-                    // Si el texto es un número, es un timestamp y hay que formatearlo
                     if (/^\d{10,}$/.test(spanText)) {
                         const unix = parseInt(spanText);
                         if (!isNaN(unix)) {
                             const eventDate = new Date(unix * 1000);
-                            // Formato: 1 jul, 01:00 a.m.
                             const day = eventDate.getDate();
                             const month = eventDate.toLocaleString('es-ES', { month: 'short' });
                             let hour = eventDate.getHours();
@@ -522,26 +426,20 @@ async function fetchWeAreCheckingFootballEvents() {
                             spanText = `${day} ${month}, ${hour}:${minuteStr} ${ampm}`;
                         }
                     }
-                    if (spanText) {
-                        time = spanText;
-                    }
-                    // El título es el texto después del span
+                    if (spanText) time = spanText;
                     title = $p.text().replace($span.text(), '').replace(/^\s*\|\s*/, '').trim();
                 }
-                // Imagen FIJA para football
-                let image = 'https://static.vecteezy.com/system/resources/previews/012/996/773/non_2x/sport-ball-football-free-png.png';
-                // Promesa para obtener los links reales
                 const eventObj = {
                     time,
                     title,
-                    link, // link a la página del evento
+                    link,
                     button: 'WAC',
-                    category: 'Football',
+                    category: 'Otros',
                     language: 'Inglés',
                     date,
                     source: 'wearechecking-football',
-                    image,
-                    options: [] // se llenará luego
+                    image: 'https://static.vecteezy.com/system/resources/previews/012/996/773/non_2x/sport-ball-football-free-png.png',
+                    options: []
                 };
                 const p = fetchWACLinksForEvent(link).then(options => {
                     eventObj.options = options;
@@ -551,7 +449,6 @@ async function fetchWeAreCheckingFootballEvents() {
             }
         });
         const results = await Promise.all(eventPromises);
-        // Solo eventos con al menos una opción válida
         return results.filter(ev => ev.options && ev.options.length > 0);
     } catch (error) {
         console.error('Error al obtener eventos de WeAreChecking Football:', error);
@@ -560,12 +457,33 @@ async function fetchWeAreCheckingFootballEvents() {
 }
 
 /**
+ * Obtiene el mapa de categorías de deportes desde streamed.su
+ */
+async function fetchStreamedSuSports() {
+    try {
+        console.log('Fetching Streamed.su sports categories...');
+        const response = await fetch('https://streamed.su/api/sports');
+        if (!response.ok) {
+            throw new Error(`Streamed.su API error for sports: ${response.status}`);
+        }
+        const sports = await response.json();
+        const sportsMap = new Map();
+        sports.forEach(sport => sportsMap.set(sport.id, sport.name));
+        console.log('Streamed.su sports categories loaded.');
+        return sportsMap;
+    } catch (error) {
+        console.error('Error fetching Streamed.su sports categories:', error.message);
+        return new Map(); // Devuelve un mapa vacío en caso de error
+    }
+}
+
+
+/**
  * Obtiene eventos en vivo desde la API de streamed.su
  */
-async function fetchStreamedSuEvents() {
+async function fetchStreamedSuEvents(sportsMap) {
     try {
         console.log('Fetching Streamed.su live matches...');
-        // Primero, obtener todos los partidos en vivo
         const matchesResponse = await fetch('https://streamed.su/api/matches/live', {
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
             timeout: 15000
@@ -582,56 +500,43 @@ async function fetchStreamedSuEvents() {
         }
         console.log(`Streamed.su: ${matches.length} partidos encontrados.`);
 
-        // Procesar cada partido para obtener sus streams y formatearlo
         const eventPromises = matches.map(async (match) => {
             try {
-                if (!match.sources || match.sources.length === 0) {
-                    return null; // Omitir partidos sin fuentes de stream
-                }
+                if (!match.sources || match.sources.length === 0) return null;
 
-                // Obtener todas las fuentes de stream para este partido en paralelo
                 const streamSourcesPromises = match.sources.map(source =>
                     fetch(`https://streamed.su/api/stream/${source.source}/${source.id}`, {
                         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
                         timeout: 10000
                     })
-                    .then(res => {
-                        if (res.ok) return res.json();
-                        // Registrar error pero no lanzar excepción para no fallar todo el Promise.all
-                        console.error(`Fallo al obtener stream: ${source.source}/${source.id}, Estado: ${res.status}`);
-                        return [];
-                    })
-                    .catch(err => {
-                         console.error(`Error obteniendo stream ${source.source}/${source.id}:`, err.message);
-                         return []; // Si la obtención de una fuente falla, devolver un array vacío
-                    })
+                    .then(res => res.ok ? res.json() : [])
+                    .catch(() => [])
                 );
 
                 const streamSourcesArrays = await Promise.all(streamSourcesPromises);
-                const allStreams = streamSourcesArrays.flat().filter(s => s && s.embedUrl); // Aplanar y asegurar que el stream sea válido
+                const allStreams = streamSourcesArrays.flat().filter(s => s && s.embedUrl);
 
-                if (allStreams.length === 0) {
-                    return null; // No se encontraron streams visibles para este partido
-                }
+                if (allStreams.length === 0) return null;
 
-                // Adaptar a la estructura de eventos de la aplicación
                 const eventDate = new Date(match.date);
                 
-                // Construir URL de la imagen. La API devuelve rutas relativas.
+                // Construir URL de la imagen para el poster del partido
                 let imageUrl = '';
-                const baseUrl = 'https://streamed.su';
                 if (match.poster) {
-                    imageUrl = new URL(match.poster, baseUrl).href;
-                } else if (match.teams?.home?.badge) {
-                    imageUrl = new URL(match.teams.home.badge, baseUrl).href;
+                     // Usar el endpoint de proxy para el poster
+                    imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
+                } else if (match.teams?.home?.badge && match.teams?.away?.badge) {
+                    // Construir poster a partir de los badges de los equipos
+                    imageUrl = `https://streamed.su/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
                 }
+
 
                 return {
                     time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                     title: match.title,
                     options: allStreams.map(stream => stream.embedUrl),
                     buttons: allStreams.map(stream => `${stream.language || 'Stream'} ${stream.hd ? 'HD' : ''}`.trim()),
-                    category: match.category,
+                    category: sportsMap.get(match.category) || 'Otros',
                     language: [...new Set(allStreams.map(s => s.language).filter(Boolean))].join(', ') || 'N/A',
                     date: eventDate.toISOString().split('T')[0],
                     source: 'streamedsu',
@@ -639,17 +544,17 @@ async function fetchStreamedSuEvents() {
                 };
             } catch (error) {
                 console.error(`Error procesando partido de Streamed.su "${match.title}":`, error);
-                return null; // Devolver null si hay un error procesando un solo partido
+                return null;
             }
         });
 
-        const events = (await Promise.all(eventPromises)).filter(Boolean); // Filtrar nulos
+        const events = (await Promise.all(eventPromises)).filter(Boolean);
         console.log(`Streamed.su: ${events.length} eventos procesados exitosamente.`);
         return events;
 
     } catch (error) {
         console.error('Error al obtener eventos de Streamed.su:', error.message);
-        return []; // Devolver array vacío en caso de fallo principal
+        return [];
     }
 }
 
@@ -670,10 +575,10 @@ export default async (req, res) => {
     }
 
     try {
-        // 1. Obtenemos la lista de canales en memoria
         const canales = await fetchChannelsObject();
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
+        const sportsMap = await fetchStreamedSuSports();
         
         const [streamTpEvents, alanGuloEvents, wacEvents, wacMotorsportsEvents, wacFootballEvents, streamedSuEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
@@ -681,7 +586,7 @@ export default async (req, res) => {
             fetchWeAreCheckingEvents(),
             fetchWeAreCheckingMotorsportsEvents(),
             fetchWeAreCheckingFootballEvents(),
-            fetchStreamedSuEvents()
+            fetchStreamedSuEvents(sportsMap)
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
@@ -708,7 +613,7 @@ export default async (req, res) => {
         
         const eventMap = new Map();
         allEvents.forEach(event => {
-            if (!event || !event.title) return; // Omitir eventos inválidos
+            if (!event || !event.title) return;
 
             if (event.title && event.title.toUpperCase().includes('MLB')) {
                 event.image = `https://${alanGuloConfig.linkDomain}/mlb`;
@@ -761,7 +666,7 @@ export default async (req, res) => {
                     title: event.title || 'Sin título',
                     options: optionsArr,
                     buttons: buttonArr,
-                    category: event.category || 'Sin categoría',
+                    category: event.category || 'Otros',
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
                     eventDay: event.date || new Date().toISOString().split('T')[0],
@@ -790,7 +695,15 @@ export default async (req, res) => {
             }
         });
 
-        const adaptedEvents = Array.from(eventMap.values());
+        let adaptedEvents = Array.from(eventMap.values());
+        
+        // Asignar imagen por defecto a eventos sin imagen
+        adaptedEvents = adaptedEvents.map(event => {
+            if (!event.image) {
+                event.image = DEFAULT_IMAGE;
+            }
+            return event;
+        });
         
         return res.status(200).json(adaptedEvents);
     } catch (error) {
