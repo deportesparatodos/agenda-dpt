@@ -132,7 +132,7 @@ async function fetchAlanGuloTVEvents(config) {
                 if (imageUrl && imageUrl.startsWith('/')) {
                     imageUrl = `https://${linkDomain}${imageUrl}`;
                 }
-                const time = $container.find('.time').text().trim() || '00:00';
+                const time = $container.find('.time').text().trim() || '-';
                 const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
                 const title = teamNames.length > 1 ? `${teamNames[0]} vs ${teamNames[1]}` : teamNames[0] || 'Evento sin título';
                 if (title.toUpperCase().includes('MLB')) {
@@ -234,7 +234,7 @@ async function fetchWeAreCheckingEvents() {
                 const match = onclick.match(/location.href='([^']+)'/);
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
                 const $p = $feed.find('p');
-                let time = '00:00';
+                let time = '-';
                 let date = new Date().toISOString().split('T')[0];
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
@@ -344,7 +344,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
                 const $p = $feed.find('p');
                 if ($p.length === 0 || /No events/i.test($p.text())) return;
-                let time = '00:00';
+                let time = '-';
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
@@ -405,7 +405,7 @@ async function fetchWeAreCheckingFootballEvents() {
                 const match = onclick.match(/location.href='([^']+)'/);
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
                 const $p = $feed.find('p');
-                let time = '00:00';
+                let time = '-';
                 let date = new Date().toISOString().split('T')[0];
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
@@ -530,8 +530,8 @@ async function fetchStreamedSuEvents(sportsMap) {
                 if (liveMatchIds.has(match.id)) {
                     status = 'En vivo';
                 } else {
-                    const now = Date.now();
-                    if (match.date > now) {
+                    const now = new Date();
+                    if (eventDate > now) {
                         status = 'Próximo';
                     } else {
                         status = 'Finalizado';
@@ -637,33 +637,10 @@ export default async (req, res) => {
 
             // Lógica de asignación de imágenes
             if (event.source !== 'streamedsu') {
-                event.image = DEFAULT_IMAGE; // Forzar imagen por defecto para todas las fuentes que no sean streamed.su
+                event.image = DEFAULT_IMAGE;
             }
 
-            if (event.time) {
-                const timeParts = event.time.split(':');
-                if (timeParts.length >= 2) {
-                    let hour = parseInt(timeParts[0]);
-                    const minute = parseInt(timeParts[1]);
-                    let newHour = hour;
-                    if (event.source === 'streamtpglobal') {
-                        newHour = hour + 2;
-                        if (newHour >= 24) newHour -= 24;
-                        event.time = `${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-                    } else if (
-                        event.source === 'wearechecking' ||
-                        event.source === 'wearechecking-football' ||
-                        event.source === 'wearechecking-motorsports'
-                    ) {
-                        newHour = hour + 7;
-                        if (newHour >= 24) newHour -= 24;
-                        event.time = `${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-                    } else {
-                        event.time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-                    }
-                }
-            }
-            const key = `${event.title || 'Sin título'}__${event.time || '00:00'}__${event.source}`;
+            const key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
             if (!eventMap.has(key)) {
                 let buttonArr = [];
                 let optionsArr = [];
@@ -684,7 +661,7 @@ export default async (req, res) => {
                     optionsArr = [event.link];
                 }
                 eventMap.set(key, {
-                    time: event.time || '00:00',
+                    time: event.time || '-',
                     title: event.title || 'Sin título',
                     options: optionsArr,
                     buttons: buttonArr,
@@ -693,8 +670,8 @@ export default async (req, res) => {
                     date: event.date || new Date().toISOString().split('T')[0],
                     eventDay: event.date || new Date().toISOString().split('T')[0],
                     source: event.source || 'unknown',
-                    image: event.image || '', // Usar la imagen ya procesada
-                    status: event.status || 'Desconocido' // Añadir estado, con fallback
+                    image: event.image || '',
+                    status: event.status || 'Desconocido'
                 });
             } else {
                 const existing = eventMap.get(key);
@@ -714,7 +691,6 @@ export default async (req, res) => {
 
         let adaptedEvents = Array.from(eventMap.values());
         
-        // Asignar imagen por defecto a eventos que sigan sin tener una
         adaptedEvents = adaptedEvents.map(event => {
             if (!event.image) {
                 event.image = DEFAULT_IMAGE;
