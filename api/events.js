@@ -452,26 +452,21 @@ async function fetchPpvToEvents() {
         data.streams.forEach(category => {
             if (Array.isArray(category.streams)) {
                 category.streams.forEach(stream => {
+                    // Procesar solo si el stream tiene un iframe
                     if (stream.iframe) {
                         const eventDate = new Date(stream.starts_at * 1000);
                         let status = 'Desconocido';
-                        if (stream.always_live === 1) {
+                        if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
                             status = 'En vivo';
-                        } else if (now >= stream.starts_at && now <= stream.ends_at) {
-                            status = 'En vivo';
-                        } else if (now < stream.starts_at) {
-                            status = 'Próximo';
-                        } else {
-                            status = 'Finalizado';
                         }
-
+                        
                         allPpvEvents.push({
                             time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false }),
                             title: stream.name,
                             options: [stream.iframe],
                             buttons: [stream.tag || 'Ver'],
                             category: stream.category_name,
-                            language: 'Inglés', // Asumido, se puede mejorar si la API lo provee
+                            language: 'Inglés', // Asumido
                             date: eventDate.toISOString().split('T')[0],
                             source: 'ppvto',
                             image: stream.poster,
