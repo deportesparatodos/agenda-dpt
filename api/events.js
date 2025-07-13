@@ -440,16 +440,17 @@ async function fetchPpvToEvents() {
         if (!response.ok) {
             throw new Error(`PPV.to API error: ${response.status}`);
         }
-        const data = await response.json();
-        if (!data.success || !Array.isArray(data.streams)) {
-            console.error('PPV.to: La respuesta de la API no fue exitosa o no tiene el formato esperado.');
+        const data = await response.json(); // La respuesta es un array de categorías
+
+        if (!Array.isArray(data)) {
+            console.error('PPV.to: La respuesta de la API no es un array como se esperaba.');
             return [];
         }
 
         const allPpvEvents = [];
         const now = Math.floor(Date.now() / 1000);
 
-        data.streams.forEach(category => {
+        data.forEach(category => {
             if (Array.isArray(category.streams)) {
                 category.streams.forEach(stream => {
                     // Procesar solo si el stream tiene un iframe
