@@ -309,126 +309,126 @@ async function fetchWeAreCheckingMotorsportsEvents() {
     }
 }
 
-// /**
-//  * Obtiene el mapa de categorías de deportes desde streamed.su
-//  */
-// async function fetchStreamedSuSports() {
-//     try {
-//         console.log('Fetching Streamed.su sports categories...');
-//         const response = await fetch('https://streamed.su/api/sports');
-//         if (!response.ok) {
-//             throw new Error(`Streamed.su API error for sports: ${response.status}`);
-//         }
-//         const sports = await response.json();
-//         const sportsMap = new Map();
-//         sports.forEach(sport => sportsMap.set(sport.id, sport.name));
-//         console.log('Streamed.su sports categories loaded.');
-//         return sportsMap;
-//     } catch (error) {
-//         console.error('Error fetching Streamed.su sports categories:', error.message);
-//         return new Map(); // Devuelve un mapa vacío en caso de error
-//     }
-// }
+/**
+ * Obtiene el mapa de categorías de deportes desde streamed.su
+ */
+async function fetchStreamedSuSports() {
+    try {
+        console.log('Fetching Streamed.su sports categories...');
+        const response = await fetch('https://streamed.su/api/sports');
+        if (!response.ok) {
+            throw new Error(`Streamed.su API error for sports: ${response.status}`);
+        }
+        const sports = await response.json();
+        const sportsMap = new Map();
+        sports.forEach(sport => sportsMap.set(sport.id, sport.name));
+        console.log('Streamed.su sports categories loaded.');
+        return sportsMap;
+    } catch (error) {
+        console.error('Error fetching Streamed.su sports categories:', error.message);
+        return new Map(); // Devuelve un mapa vacío en caso de error
+    }
+}
 
 
-// /**
-//  * Obtiene eventos en vivo desde la API de streamed.su
-//  */
-// async function fetchStreamedSuEvents(sportsMap) {
-//     try {
-//         // 1. Obtener IDs de los partidos EN VIVO
-//         console.log('Fetching Streamed.su live match IDs...');
-//         const liveMatchesResponse = await fetch('https://streamed.su/api/matches/live', {
-//             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-//             timeout: 15000
-//         });
-//         if (!liveMatchesResponse.ok) throw new Error('Failed to fetch live matches');
-//         const liveMatches = await liveMatchesResponse.json();
-//         const liveMatchIds = new Set(liveMatches.map(m => m.id));
-//         console.log(`${liveMatchIds.size} live match IDs loaded.`);
+/**
+ * Obtiene eventos en vivo desde la API de streamed.su
+ */
+async function fetchStreamedSuEvents(sportsMap) {
+    try {
+        // 1. Obtener IDs de los partidos EN VIVO
+        console.log('Fetching Streamed.su live match IDs...');
+        const liveMatchesResponse = await fetch('https://streamed.su/api/matches/live', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            timeout: 15000
+        });
+        if (!liveMatchesResponse.ok) throw new Error('Failed to fetch live matches');
+        const liveMatches = await liveMatchesResponse.json();
+        const liveMatchIds = new Set(liveMatches.map(m => m.id));
+        console.log(`${liveMatchIds.size} live match IDs loaded.`);
 
-//         // 2. Obtener TODOS los partidos
-//         console.log('Fetching ALL Streamed.su matches...');
-//         const allMatchesResponse = await fetch('https://streamed.su/api/matches/all', {
-//             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-//             timeout: 20000
-//         });
-//         if (!allMatchesResponse.ok) throw new Error('Failed to fetch all matches');
-//         const allMatches = await allMatchesResponse.json();
-//         console.log(`Streamed.su: ${allMatches.length} total matches found.`);
+        // 2. Obtener TODOS los partidos
+        console.log('Fetching ALL Streamed.su matches...');
+        const allMatchesResponse = await fetch('https://streamed.su/api/matches/all', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            timeout: 20000
+        });
+        if (!allMatchesResponse.ok) throw new Error('Failed to fetch all matches');
+        const allMatches = await allMatchesResponse.json();
+        console.log(`Streamed.su: ${allMatches.length} total matches found.`);
 
-//         // 3. Procesar todos los partidos para crear los eventos
-//         const eventPromises = allMatches.map(async (match) => {
-//             try {
-//                 if (!match.sources || match.sources.length === 0) return null;
+        // 3. Procesar todos los partidos para crear los eventos
+        const eventPromises = allMatches.map(async (match) => {
+            try {
+                if (!match.sources || match.sources.length === 0) return null;
 
-//                 const streamSourcesPromises = match.sources.map(source =>
-//                     fetch(`https://streamed.su/api/stream/${source.source}/${source.id}`, {
-//                         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-//                         timeout: 10000
-//                     })
-//                     .then(res => res.ok ? res.json() : [])
-//                     .catch(() => [])
-//                 );
+                const streamSourcesPromises = match.sources.map(source =>
+                    fetch(`https://streamed.su/api/stream/${source.source}/${source.id}`, {
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+                        timeout: 10000
+                    })
+                    .then(res => res.ok ? res.json() : [])
+                    .catch(() => [])
+                );
 
-//                 const streamSourcesArrays = await Promise.all(streamSourcesPromises);
-//                 const allStreams = streamSourcesArrays.flat().filter(s => s && s.embedUrl);
+                const streamSourcesArrays = await Promise.all(streamSourcesPromises);
+                const allStreams = streamSourcesArrays.flat().filter(s => s && s.embedUrl);
 
-//                 if (allStreams.length === 0) return null;
+                if (allStreams.length === 0) return null;
 
-//                 const eventDate = new Date(match.date);
+                const eventDate = new Date(match.date);
                 
-//                 const isLive = liveMatchIds.has(match.id);
-//                 const status = isLive ? 'En vivo' : 'Desconocido';
-//                 const time = isLive ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
+                const isLive = liveMatchIds.has(match.id);
+                const status = isLive ? 'En vivo' : 'Desconocido';
+                const time = isLive ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
 
-//                 // Lógica de imágenes con la prioridad correcta
-//                 let imageUrl = '';
-//                 if (match.teams?.home?.badge && match.teams?.away?.badge) {
-//                     imageUrl = `https://streamed.su/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
-//                 } else if (match.poster) {
-//                     imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
-//                 } else if (match.teams?.home?.badge) {
-//                     imageUrl = `https://streamed.su/api/images/badge/${match.teams.home.badge}.webp`;
-//                 } else if (match.teams?.away?.badge) {
-//                     imageUrl = `https://streamed.su/api/images/badge/${match.teams.away.badge}.webp`;
-//                 }
+                // Lógica de imágenes con la prioridad correcta
+                let imageUrl = '';
+                if (match.teams?.home?.badge && match.teams?.away?.badge) {
+                    imageUrl = `https://streamed.su/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
+                } else if (match.poster) {
+                    imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
+                } else if (match.teams?.home?.badge) {
+                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.home.badge}.webp`;
+                } else if (match.teams?.away?.badge) {
+                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.away.badge}.webp`;
+                }
 
-//                 const buttons = allStreams.map(stream => {
-//                     let name = (stream.language || `Stream ${stream.streamNo}`).toUpperCase().trim();
-//                     if (stream.hd) {
-//                         name += ' HD';
-//                     }
-//                     return name;
-//                 });
+                const buttons = allStreams.map(stream => {
+                    let name = (stream.language || `Stream ${stream.streamNo}`).toUpperCase().trim();
+                    if (stream.hd) {
+                        name += ' HD';
+                    }
+                    return name;
+                });
 
-//                 return {
-//                     time: time,
-//                     title: match.title,
-//                     options: allStreams.map(stream => stream.embedUrl),
-//                     buttons: buttons,
-//                     category: sportsMap.get(match.category) || 'Otros',
-//                     language: [...new Set(allStreams.map(s => s.language).filter(Boolean))].join(', ') || 'N/A',
-//                     date: eventDate.toISOString().split('T')[0],
-//                     source: 'streamedsu',
-//                     image: imageUrl,
-//                     status: status,
-//                 };
-//             } catch (error) {
-//                 console.error(`Error procesando partido de Streamed.su "${match.title}":`, error);
-//                 return null;
-//             }
-//         });
+                return {
+                    time: time,
+                    title: match.title,
+                    options: allStreams.map(stream => stream.embedUrl),
+                    buttons: buttons,
+                    category: sportsMap.get(match.category) || 'Otros',
+                    language: [...new Set(allStreams.map(s => s.language).filter(Boolean))].join(', ') || 'N/A',
+                    date: eventDate.toISOString().split('T')[0],
+                    source: 'streamedsu',
+                    image: imageUrl,
+                    status: status,
+                };
+            } catch (error) {
+                console.error(`Error procesando partido de Streamed.su "${match.title}":`, error);
+                return null;
+            }
+        });
 
-//         const events = (await Promise.all(eventPromises)).filter(Boolean);
-//         console.log(`Streamed.su: ${events.length} eventos procesados exitosamente.`);
-//         return events;
+        const events = (await Promise.all(eventPromises)).filter(Boolean);
+        console.log(`Streamed.su: ${events.length} eventos procesados exitosamente.`);
+        return events;
 
-//     } catch (error) {
-//         console.error('Error al obtener eventos de Streamed.su:', error.message);
-//         return [];
-//     }
-// }
+    } catch (error) {
+        console.error('Error al obtener eventos de Streamed.su:', error.message);
+        return [];
+    }
+}
 
 /**
  * Obtiene eventos desde la API de ppv.to
@@ -505,29 +505,29 @@ export default async (req, res) => {
         const canales = await fetchChannelsObject();
         console.log('Iniciando obtención de eventos...');
         const alanGuloConfig = await getDynamicAlanGuloConfig();
-        // const sportsMap = await fetchStreamedSuSports();
+        const sportsMap = await fetchStreamedSuSports();
         
-        const [streamTpEvents, alanGuloEvents, wacMotorsportsEvents, ppvToEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacMotorsportsEvents, streamedSuEvents, ppvToEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingMotorsportsEvents(),
-            // fetchStreamedSuEvents(sportsMap),
+            fetchStreamedSuEvents(sportsMap),
             fetchPpvToEvents()
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
         const alanEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
-        // const newStreamedSuEvents = streamedSuEvents.status === 'fulfilled' ? streamedSuEvents.value : [];
+        const newStreamedSuEvents = streamedSuEvents.status === 'fulfilled' ? streamedSuEvents.value : [];
         const newPpvToEvents = ppvToEvents.status === 'fulfilled' ? ppvToEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
-        // if (streamedSuEvents.status === 'rejected') console.error('Streamed.su falló:', streamedSuEvents.reason);
+        if (streamedSuEvents.status === 'rejected') console.error('Streamed.su falló:', streamedSuEvents.reason);
         if (ppvToEvents.status === 'rejected') console.error('PPV.to falló:', ppvToEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingMotorsportsEvents, ...newPpvToEvents];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingMotorsportsEvents, ...newStreamedSuEvents, ...newPpvToEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
