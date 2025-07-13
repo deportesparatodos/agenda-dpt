@@ -162,7 +162,7 @@ async function fetchAlanGuloTVEvents(config) {
                                     if (channelsMatch && channelsMatch[1]) {
                                         let channelsObj;
                                         try {
-                                            channelsObj = eval('(' + channelsMatch[1] + ')');
+                                            channelsObj = eval('(' + channelsObjectString + ')');
                                         } catch (e) {
                                             return;
                                         }
@@ -336,7 +336,14 @@ async function fetchWeAreCheckingMotorsportsEvents() {
         const eventPromises = [];
         $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
             const $wrapper = $(el);
-            let image = 'https://images.vexels.com/media/users/3/139434/isolated/preview/4bcbe9b4d3e6f6e4c1207c142a98c2d8-carrera-de-coches-de-carreras-de-ferrari.png';
+            // Extraer la imagen de la card actual
+            const imageSrc = $wrapper.find('.stream-thumb').attr('src');
+            let imageUrl = DEFAULT_IMAGE; // Usar imagen por defecto como fallback
+            if (imageSrc) {
+                // Construir la URL absoluta
+                imageUrl = `https://wearechecking.online/${imageSrc.replace(/..[\\/]/, '')}`;
+            }
+
             $wrapper.find('.stream-feed[onclick]').each((j, feedEl) => {
                 const $feed = $(feedEl);
                 const onclick = $feed.attr('onclick');
@@ -361,7 +368,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     language: 'Inglés',
                     date: new Date().toISOString().split('T')[0],
                     source: 'wearechecking-motorsports',
-                    image,
+                    image: imageUrl, // Usar la imagen de la card
                     options: []
                 };
                 const p = fetchWACLinksForEvent(link).then(options => {
