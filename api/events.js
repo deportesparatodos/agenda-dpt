@@ -2,8 +2,79 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
+import puppeteer from 'puppeteer';
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
+let browser; // Variable para mantener una única instancia del navegador
+
+/**
+ * Inicia una instancia de Puppeteer si no existe.
+ */
+async function initializeBrowser() {
+    if (!browser) {
+        console.log('[PUPPETEER] Iniciando navegador para búsqueda de imágenes...');
+        try {
+            browser = await puppeteer.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+            console.log('[PUPPETEER] Navegador iniciado.');
+        } catch (error) {
+            console.error('[PUPPETEER] Error al iniciar el navegador:', error);
+            browser = null; // Asegurarse de que no se use una instancia rota
+        }
+    }
+}
+
+/**
+ * Cierra la instancia global del navegador Puppeteer.
+ */
+async function closeBrowser() {
+    if (browser) {
+        await browser.close();
+        browser = null;
+        console.log('[PUPPETEER] Navegador cerrado.');
+    }
+}
+
+/**
+ * Usa Puppeteer para buscar en Google Images y devolver la URL de la primera imagen.
+ * @param {string} query - El título del evento a buscar.
+ * @returns {string|null} - La URL de la imagen o null si no se encuentra.
+ */
+async function findEventImageWithPuppeteer(query) {
+    if (!browser) {
+        console.error('[PUPPETEER] El navegador no está inicializado. No se puede buscar imagen.');
+        return null;
+    }
+    let page;
+    try {
+        page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
+        
+        const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=isch`;
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 10000 });
+
+        const imageUrl = await page.evaluate(() => {
+            const firstImage = document.querySelector('img.DS1iW, img.YQ4gaf'); // Selectores comunes
+            return firstImage ? firstImage.src : null;
+        });
+        
+        if (imageUrl && imageUrl.startsWith('http')) {
+            console.log(`[PUPPETEER] Imagen encontrada para "${query}"`);
+            return imageUrl;
+        }
+        return null;
+    } catch (error) {
+        console.error(`[PUPPETEER] Error buscando imagen para "${query}":`, error.message);
+        return null;
+    } finally {
+        if (page) {
+            await page.close();
+        }
+    }
+}
+
 
 /**
  * PRIMER PASO: Scrapea y devuelve la lista de canales desde la web (en memoria, no guarda archivo).
@@ -388,6 +459,10 @@ async function fetchStreamedSuEvents(sportsMap) {
                     imageUrl = `https://streamed.su/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
                 } else if (match.poster) {
                     imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
+                } else if (match.teams?.home?.badge) {
+                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.home.badge}.webp`;
+                } else if (match.teams?.away?.badge) {
+                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.away.badge}.webp`;
                 }
 
                 const buttons = allStreams.map(stream => {
