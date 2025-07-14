@@ -436,13 +436,14 @@ async function fetchStreamedSuEvents(sportsMap) {
 async function fetchPpvToEvents() {
     try {
         console.log('Fetching PPV.to eventos...');
-        const response = await fetch('https://ppv.to/api/streams');
+        const response = await fetch('https://ppv.to/api/streams', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+        });
         if (!response.ok) {
             throw new Error(`PPV.to API error: ${response.status}`);
         }
         const data = await response.json();
         
-        // Corregido: Acceder a la propiedad 'streams' del objeto de respuesta
         const categories = data.streams;
 
         if (!Array.isArray(categories)) {
@@ -456,7 +457,6 @@ async function fetchPpvToEvents() {
         categories.forEach(category => {
             if (Array.isArray(category.streams)) {
                 category.streams.forEach(stream => {
-                    // Procesar solo si el stream tiene un iframe
                     if (stream.iframe) {
                         const eventDate = new Date(stream.starts_at * 1000);
                         let status = 'Desconocido';
@@ -470,7 +470,7 @@ async function fetchPpvToEvents() {
                             options: [stream.iframe],
                             buttons: [stream.tag || 'Ver'],
                             category: stream.category_name,
-                            language: 'Inglés', // Asumido
+                            language: 'Inglés',
                             date: eventDate.toISOString().split('T')[0],
                             source: 'ppvto',
                             image: stream.poster,
