@@ -452,6 +452,8 @@ async function fetchPpvToEvents() {
             if (Array.isArray(category.streams)) {
                 category.streams.forEach(stream => {
                     if (stream.iframe) {
+                        // Usar category_name o el nombre de la categoría padre
+                        const catName = stream.category_name || category.category || 'Otros';
                         // Formatear la hora en 24hs y zona Buenos Aires
                         const eventDate = new Date(stream.starts_at * 1000);
                         const time = eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
@@ -464,11 +466,11 @@ async function fetchPpvToEvents() {
                             title: stream.name,
                             options: [stream.iframe],
                             buttons: [stream.tag || 'Ver'],
-                            category: stream.category_name,
+                            category: catName,
                             language: 'Inglés', // Asumido
                             date: eventDate.toISOString().split('T')[0],
                             source: 'ppvto',
-                            image: stream.poster,
+                            image: stream.poster || '',
                             status: status,
                         });
                     }
