@@ -6,73 +6,6 @@ import path from 'path';
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
 /**
- * PRIMER PASO: Scrapea y devuelve la lista de canales desde la web (en memoria, no guarda archivo).
- */
-async function fetchChannelsObject() {
-    const url = 'https://alangulotv.space/canal/';
-    console.log(`[SCRAPER] Iniciando actualización de canales desde: ${url}`);
-    try {
-        const response = await fetch(url, { timeout: 15000 });
-        if (!response.ok) {
-            throw new Error(`Error al acceder a la página de canales. Estado: ${response.status}`);
-        }
-        const html = await response.text();
-        const regex = /const\s+channels\s*=\s*(\{[\s\S]*?\});/;
-        const match = html.match(regex);
-        if (match && match[1]) {
-            let channelsObjectString = match[1];
-            let parsedObject;
-            try {
-                // eslint-disable-next-line no-eval
-                parsedObject = eval('(' + channelsObjectString + ')');
-            } catch (e) {
-                console.error('[SCRAPER] Error al evaluar el objeto channels:', e);
-                return { canales: {} };
-            }
-            console.log(`[SCRAPER] ¡Éxito! Canales obtenidos en memoria.`);
-            return { canales: parsedObject };
-        } else {
-            console.error("[SCRAPER] No se pudo encontrar el objeto 'const channels' en el HTML.");
-            return { canales: {} };
-        }
-    } catch (error) {
-        console.error("[SCRAPER] Falló la actualización de canales.", error.message);
-        return { canales: {} };
-    }
-}
-
-/**
- * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
- */
-async function getDynamicAlanGuloConfig() {
-    const mainUrl = 'https://alangulotv.blog'; // Dominio actualizado
-    try {
-        const response = await fetch(mainUrl, {
-            redirect: 'follow',
-            timeout: 15000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-        });
-        const finalUrl = new URL(response.url);
-        const baseDomain = finalUrl.hostname;
-        const linkDomain = `p.${baseDomain}`;
-        const agendaUrl = `https://${baseDomain}/agenda-2/`;
-        const baseOrigin = `https://${baseDomain}`;
-
-        console.log(`Dominio de AlanGuloTV detectado: ${baseDomain}`);
-        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
-    } catch (error) {
-        console.error('No se pudo obtener el dominio dinámico de AlanGuloTV. Usando valores por defecto.', error);
-        const baseDomain = 'alangulotv.space';
-        const linkDomain = `p.${baseDomain}`;
-        const agendaUrl = `https://${baseDomain}/agenda-2/`;
-        const baseOrigin = `https://${baseDomain}`;
-        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
-    }
-}
-
-/**
  * Función para hacer scraping de streamtpglobal.com
  */
 async function fetchStreamTpGlobalEvents() {
@@ -97,112 +30,6 @@ async function fetchStreamTpGlobalEvents() {
         }));
     } catch (error) {
         console.error('Error al obtener eventos de StreamTpGlobal:', error);
-        return [];
-    }
-}
-
-/**
- * Función para hacer scraping de alangulotv usando Cheerio
- */
-async function fetchAlanGuloTVEvents(config) {
-    const { agendaUrl, linkDomain, baseOrigin } = config; // Usar URL dinámica y origen base
-    try {
-        console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
-        const response = await fetch(agendaUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            timeout: 15000
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        const html = await response.text();
-        const $ = cheerio.load(html);
-        const events = [];
-        const eventPromises = [];
-        $('.match-container').each((index, element) => {
-            try {
-                const $container = $(element);
-                let imageUrl = $container.find('img.event-logo').attr('src') || '';
-                if (!imageUrl) {
-                    imageUrl = $container.find('img.team-logo').first().attr('src') || '';
-                }
-                if (imageUrl && imageUrl.startsWith('/')) {
-                    imageUrl = `https://${linkDomain}${imageUrl}`;
-                }
-                const time = $container.find('.time').text().trim() || '-';
-                const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
-                const title = teamNames.length > 1 ? `${teamNames[0]} vs ${teamNames[1]}` : teamNames[0] || 'Evento sin título';
-                if (title.toUpperCase().includes('MLB')) {
-                    imageUrl = `https://${linkDomain}/mlb`;
-                }
-                const $linksContainer = $container.next('.links-container');
-                if ($linksContainer.length > 0) {
-                    $linksContainer.find('.link-button, a').each((i, linkEl) => {
-                        const $link = $(linkEl);
-                        const href = $link.attr('href');
-                        const buttonName = $link.text().trim() || 'CANAL';
-                        if (href) {
-                            let eventPageUrl = href.startsWith('http') ? href : `${baseOrigin}${href}`; // Corregido para usar el origen dinámico
-                            const pathParts = href.split('/').filter(part => part.length > 0);
-                            const linkKey = pathParts[pathParts.length - 1];
-                            const p = (async () => {
-                                try {
-                                    const subRes = await fetch(eventPageUrl, {
-                                        headers: {
-                                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                                        },
-                                        timeout: 15000
-                                    });
-                                    if (!subRes.ok) return;
-                                    const subHtml = await subRes.text();
-                                    const channelsMatch = subHtml.match(/const\s+channels\s*=\s*(\{[\s\S]*?\});/);
-                                    if (channelsMatch && channelsMatch[1]) {
-                                        let channelsObj;
-                                        try {
-                                            channelsObj = eval('(' + channelsObjectString + ')');
-                                        } catch (e) {
-                                            return;
-                                        }
-                                        if (channelsObj[linkKey]) {
-                                            const channelData = channelsObj[linkKey];
-                                            const firstAvailableKey = Object.keys(channelData)[0];
-                                            if (firstAvailableKey) {
-                                                const finalLink = channelData[firstAvailableKey];
-                                                if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
-                                                    events.push({
-                                                        time,
-                                                        title,
-                                                        link: finalLink,
-                                                        button: buttonName,
-                                                        category: 'Otros',
-                                                        language: 'Español',
-                                                        date: new Date().toISOString().split('T')[0],
-                                                        source: 'alangulotv',
-                                                        image: imageUrl
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch (e) {
-                                    // Ignorar errores
-                                }
-                            })();
-                            eventPromises.push(p);
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error procesando evento AlanGuloTV:', error);
-            }
-        });
-        await Promise.all(eventPromises);
-        console.log(`AlanGuloTV: ${events.length} eventos obtenidos`);
-        return events;
-    } catch (error) {
-        console.error('Error al obtener eventos de AlanGuloTV:', error);
         return [];
     }
 }
@@ -459,29 +286,24 @@ export default async (req, res) => {
     }
 
     try {
-        const canales = await fetchChannelsObject();
         console.log('Iniciando obtención de eventos...');
-        const alanGuloConfig = await getDynamicAlanGuloConfig();
         const sportsMap = await fetchStreamedSuSports();
         
-        const [streamTpEvents, alanGuloEvents, wacMotorsportsEvents, streamedSuEvents] = await Promise.allSettled([
+        const [streamTpEvents, wacMotorsportsEvents, streamedSuEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
-            fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingMotorsportsEvents(),
             fetchStreamedSuEvents(sportsMap)
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
-        const alanEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const newStreamedSuEvents = streamedSuEvents.status === 'fulfilled' ? streamedSuEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
-        if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
         if (streamedSuEvents.status === 'rejected') console.error('Streamed.su falló:', streamedSuEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingMotorsportsEvents, ...newStreamedSuEvents];
+        const allEvents = [...streamEvents, ...wearecheckingMotorsportsEvents, ...newStreamedSuEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
