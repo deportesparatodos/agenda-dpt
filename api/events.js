@@ -575,6 +575,10 @@ export default async (req, res) => {
                 } else if (event.button) {
                     buttonArr = [event.button];
                     optionsArr = [event.link];
+                } else if (Array.isArray(event.options) && Array.isArray(event.buttons)) {
+                    // Para eventos que solo tienen options y buttons (como ppv.to)
+                    buttonArr = event.buttons;
+                    optionsArr = event.options;
                 } else {
                     optionsArr = [event.link];
                 }
