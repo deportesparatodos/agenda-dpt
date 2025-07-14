@@ -431,7 +431,7 @@ async function fetchStreamedSuEvents(sportsMap) {
 }
 
 /**
- * Obtiene eventos desde la API de ppv.to (estructura robusta y fiel a la doc)
+ * Obtiene eventos desde la API de ppv.to (forzado: siempre agrega, poster y título, botón Opción 1, hora 00:00 si falta)
  */
 async function fetchPpvToEvents() {
     try {
@@ -446,35 +446,33 @@ async function fetchPpvToEvents() {
             return [];
         }
         const allPpvEvents = [];
-        const now = Math.floor(Date.now() / 1000);
         data.streams.forEach(category => {
             if (!Array.isArray(category.streams)) return;
             category.streams.forEach(stream => {
-                if (!stream.iframe) return;
-                // Categoría
+                // SIEMPRE agregar aunque falte info
                 const catName = stream.category_name || category.category || 'Otros';
-                // Imagen
                 const image = stream.poster || '';
-                // Hora y fecha
-                const eventDate = new Date(stream.starts_at * 1000);
-                const time = eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
-                const date = eventDate.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }).split('/').reverse().join('-');
-                // Status
-                let status = 'Desconocido';
-                if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
-                    status = 'En vivo';
+                const title = stream.name || 'Evento PPV.to';
+                // Hora: si no hay starts_at, poner 00:00
+                let time = '00:00';
+                let date = new Date().toISOString().split('T')[0];
+                if (stream.starts_at) {
+                    const eventDate = new Date(stream.starts_at * 1000);
+                    time = eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
+                    date = eventDate.toISOString().split('T')[0];
                 }
+                // Botón: siempre "Opción 1"
                 allPpvEvents.push({
                     time: time,
-                    title: stream.name,
-                    options: [stream.iframe],
-                    buttons: [stream.tag || 'Ver'],
+                    title: title,
+                    options: [stream.iframe || ''],
+                    buttons: ['Opción 1'],
                     category: catName,
                     language: 'Inglés',
                     date: date,
                     source: 'ppvto',
                     image: image,
-                    status: status
+                    status: 'Desconocido'
                 });
             });
         });
