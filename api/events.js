@@ -45,7 +45,7 @@ async function fetchChannelsObject() {
  * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
  */
 async function getDynamicAlanGuloConfig() {
-    const mainUrl = 'https://alangulotv.live';
+    const mainUrl = 'https://alangulotv.blog'; // Dominio actualizado
     try {
         const response = await fetch(mainUrl, {
             redirect: 'follow',
@@ -105,7 +105,7 @@ async function fetchStreamTpGlobalEvents() {
  * Función para hacer scraping de alangulotv usando Cheerio
  */
 async function fetchAlanGuloTVEvents(config) {
-    const { agendaUrl, linkDomain } = config; // Usar URL dinámica
+    const { agendaUrl, linkDomain, baseOrigin } = config; // Usar URL dinámica y origen base
     try {
         console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
         const response = await fetch(agendaUrl, {
@@ -144,7 +144,7 @@ async function fetchAlanGuloTVEvents(config) {
                         const href = $link.attr('href');
                         const buttonName = $link.text().trim() || 'CANAL';
                         if (href) {
-                            let eventPageUrl = href.startsWith('http') ? href : `https://alangulotv.me${href}`;
+                            let eventPageUrl = href.startsWith('http') ? href : `${baseOrigin}${href}`; // Corregido para usar el origen dinámico
                             const pathParts = href.split('/').filter(part => part.length > 0);
                             const linkKey = pathParts[pathParts.length - 1];
                             const p = (async () => {
