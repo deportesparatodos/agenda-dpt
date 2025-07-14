@@ -105,8 +105,7 @@ async function fetchStreamTpGlobalEvents() {
  * Función para hacer scraping de alangulotv usando Cheerio
  */
 async function fetchAlanGuloTVEvents(config) {
-    const agendaUrl = 'https://alangulotv.me/agenda-2/';
-    const linkDomain = 'p.alangulotv.space';
+    const { agendaUrl, linkDomain } = config; // Usar URL dinámica
     try {
         console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
         const response = await fetch(agendaUrl, {
@@ -336,29 +335,44 @@ async function fetchStreamedSuSports() {
  */
 async function fetchStreamedSuEvents(sportsMap) {
     try {
-        // 1. Obtener IDs de los partidos EN VIVO
-        console.log('Fetching Streamed.su live match IDs...');
-        const liveMatchesResponse = await fetch('https://streamed.su/api/matches/live', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-            timeout: 15000
-        });
-        if (!liveMatchesResponse.ok) throw new Error('Failed to fetch live matches');
-        const liveMatches = await liveMatchesResponse.json();
-        const liveMatchIds = new Set(liveMatches.map(m => m.id));
-        console.log(`${liveMatchIds.size} live match IDs loaded.`);
+        console.log('Fetching Streamed.su live and today matches...');
+        const [liveResponse, todayResponse] = await Promise.allSettled([
+            fetch('https://streamed.su/api/matches/live', { headers: { 'User-Agent': 'Mozilla/5.0' } }),
+            fetch('https://streamed.su/api/matches/all-today', { headers: { 'User-Agent': 'Mozilla/5.0' } })
+        ]);
 
-        // 2. Obtener TODOS los partidos
-        console.log('Fetching ALL Streamed.su matches...');
-        const allMatchesResponse = await fetch('https://streamed.su/api/matches/all', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-            timeout: 20000
-        });
-        if (!allMatchesResponse.ok) throw new Error('Failed to fetch all matches');
-        const allMatches = await allMatchesResponse.json();
-        console.log(`Streamed.su: ${allMatches.length} total matches found.`);
+        const matchesMap = new Map();
 
-        // 3. Procesar todos los partidos para crear los eventos
-        const eventPromises = allMatches.map(async (match) => {
+        // Procesar eventos en vivo
+        if (liveResponse.status === 'fulfilled' && liveResponse.value.ok) {
+            const liveMatches = await liveResponse.value.json();
+            liveMatches.forEach(match => {
+                matchesMap.set(match.id, { ...match, computedStatus: 'En vivo' });
+            });
+        } else {
+            console.error('Failed to fetch live matches from Streamed.su');
+        }
+
+        // Procesar eventos de hoy
+        if (todayResponse.status === 'fulfilled' && todayResponse.value.ok) {
+            const todayMatches = await todayResponse.value.json();
+            todayMatches.forEach(match => {
+                if (!matchesMap.has(match.id)) { // No sobreescribir si ya está como "En vivo"
+                    const now = new Date();
+                    const eventDate = new Date(match.date);
+                    const status = eventDate > now ? 'Próximo' : 'Finalizado';
+                    matchesMap.set(match.id, { ...match, computedStatus: status });
+                }
+            });
+        } else {
+            console.error('Failed to fetch today\'s matches from Streamed.su');
+        }
+
+        const uniqueMatches = Array.from(matchesMap.values());
+        console.log(`Streamed.su: ${uniqueMatches.length} total matches found for today/live.`);
+
+        // Procesar todos los partidos para crear los eventos
+        const eventPromises = uniqueMatches.map(async (match) => {
             try {
                 if (!match.sources || match.sources.length === 0) return null;
 
@@ -378,14 +392,18 @@ async function fetchStreamedSuEvents(sportsMap) {
 
                 const eventDate = new Date(match.date);
                 
-                const isLive = liveMatchIds.has(match.id);
-                const status = isLive ? 'En vivo' : 'Desconocido';
-                const time = isLive ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
+                const time = match.computedStatus === 'En vivo' ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
 
-                // Lógica de imágenes estricta: solo Match Posters
+                // Lógica de imágenes con la prioridad correcta
                 let imageUrl = '';
                 if (match.teams?.home?.badge && match.teams?.away?.badge) {
                     imageUrl = `https://streamed.su/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
+                } else if (match.poster) {
+                    imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
+                } else if (match.teams?.home?.badge) {
+                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.home.badge}.webp`;
+                } else if (match.teams?.away?.badge) {
+                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.away.badge}.webp`;
                 }
 
                 const buttons = allStreams.map(stream => {
@@ -406,7 +424,7 @@ async function fetchStreamedSuEvents(sportsMap) {
                     date: eventDate.toISOString().split('T')[0],
                     source: 'streamedsu',
                     image: imageUrl,
-                    status: status,
+                    status: match.computedStatus,
                 };
             } catch (error) {
                 console.error(`Error procesando partido de Streamed.su "${match.title}":`, error);
