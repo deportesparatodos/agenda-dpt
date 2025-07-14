@@ -431,7 +431,7 @@ async function fetchStreamedSuEvents(sportsMap) {
 }
 
 /**
- * Obtiene eventos desde la API de ppv.to
+ * Obtiene eventos desde la API de ppv.to (estructura robusta y fiel a la doc)
  */
 async function fetchPpvToEvents() {
     try {
@@ -441,41 +441,42 @@ async function fetchPpvToEvents() {
             throw new Error(`PPV.to API error: ${response.status}`);
         }
         const data = await response.json();
-        const categories = data.streams;
-        if (!Array.isArray(categories)) {
+        if (!Array.isArray(data.streams)) {
             console.error('PPV.to: La propiedad "streams" no es un array como se esperaba.');
             return [];
         }
         const allPpvEvents = [];
         const now = Math.floor(Date.now() / 1000);
-        categories.forEach(category => {
-            if (Array.isArray(category.streams)) {
-                category.streams.forEach(stream => {
-                    if (stream.iframe) {
-                        // Usar category_name o el nombre de la categoría padre
-                        const catName = stream.category_name || category.category || 'Otros';
-                        // Formatear la hora en 24hs y zona Buenos Aires
-                        const eventDate = new Date(stream.starts_at * 1000);
-                        const time = eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
-                        let status = 'Desconocido';
-                        if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
-                            status = 'En vivo';
-                        }
-                        allPpvEvents.push({
-                            time: time,
-                            title: stream.name,
-                            options: [stream.iframe],
-                            buttons: [stream.tag || 'Ver'],
-                            category: catName,
-                            language: 'Inglés', // Asumido
-                            date: eventDate.toISOString().split('T')[0],
-                            source: 'ppvto',
-                            image: stream.poster || '',
-                            status: status,
-                        });
-                    }
+        data.streams.forEach(category => {
+            if (!Array.isArray(category.streams)) return;
+            category.streams.forEach(stream => {
+                if (!stream.iframe) return;
+                // Categoría
+                const catName = stream.category_name || category.category || 'Otros';
+                // Imagen
+                const image = stream.poster || '';
+                // Hora y fecha
+                const eventDate = new Date(stream.starts_at * 1000);
+                const time = eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
+                const date = eventDate.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }).split('/').reverse().join('-');
+                // Status
+                let status = 'Desconocido';
+                if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
+                    status = 'En vivo';
+                }
+                allPpvEvents.push({
+                    time: time,
+                    title: stream.name,
+                    options: [stream.iframe],
+                    buttons: [stream.tag || 'Ver'],
+                    category: catName,
+                    language: 'Inglés',
+                    date: date,
+                    source: 'ppvto',
+                    image: image,
+                    status: status
                 });
-            }
+            });
         });
         console.log(`PPV.to: ${allPpvEvents.length} eventos procesados exitosamente.`);
         return allPpvEvents;
@@ -544,32 +545,42 @@ export default async (req, res) => {
         });
         
         const eventMap = new Map();
-        let ppvToCounter = 0;
         allEvents.forEach(event => {
             if (!event || !event.title) return;
 
             // Lógica de asignación de imágenes
-            if (!event.image) { // Si el evento no tiene imagen
+            if (!event.image) {
                 const categoryKey = event.category?.toLowerCase();
                 if (categoryKey && ppvPosterMap.has(categoryKey)) {
-                    event.image = ppvPosterMap.get(categoryKey); // Usar poster de ppv.to si la categoría coincide
+                    event.image = ppvPosterMap.get(categoryKey);
                 }
             }
 
-            // Clave base
             let key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
-
-            // Si es PPV.to, aseguramos que nunca se sobrescriba ni sobrescriba otros
+            // --- Para ppv.to, si la key ya existe, agregar sufijo incremental ---
             if (event.source === 'ppvto') {
-                // Si ya existe, agregamos un sufijo incremental
-                let uniqueKey = key;
-                while (eventMap.has(uniqueKey)) {
-                    ppvToCounter++;
-                    uniqueKey = `${key}__ppvto${ppvToCounter}`;
+                let suffix = 1;
+                let originalKey = key;
+                while (eventMap.has(key)) {
+                    key = `${originalKey}__ppvto_${suffix}`;
+                    suffix++;
                 }
-                key = uniqueKey;
+                eventMap.set(key, {
+                    time: event.time || '-',
+                    title: event.title || 'Sin título',
+                    options: event.options || [],
+                    buttons: event.buttons || [],
+                    category: event.category || 'Otros',
+                    language: event.language || 'Desconocido',
+                    date: event.date || new Date().toISOString().split('T')[0],
+                    source: event.source || 'unknown',
+                    image: event.image || '',
+                    status: event.status || 'Desconocido'
+                });
+                return;
             }
 
+            // --- Lógica original para el resto ---
             if (!eventMap.has(key)) {
                 let buttonArr = [];
                 let optionsArr = [];
@@ -583,14 +594,10 @@ export default async (req, res) => {
                 } else if (event.source === 'streamedsu' && Array.isArray(event.options)) {
                     buttonArr = event.buttons;
                     optionsArr = event.options;
-                } else if (event.source === 'ppvto' && Array.isArray(event.options)) {
-                    buttonArr = event.buttons;
-                    optionsArr = event.options;
                 } else if (event.button) {
                     buttonArr = [event.button];
                     optionsArr = [event.link];
                 } else if (Array.isArray(event.options) && Array.isArray(event.buttons)) {
-                    // Para eventos que solo tienen options y buttons (como ppv.to)
                     buttonArr = event.buttons;
                     optionsArr = event.options;
                 } else {
