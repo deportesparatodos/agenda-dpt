@@ -441,31 +441,26 @@ async function fetchPpvToEvents() {
             throw new Error(`PPV.to API error: ${response.status}`);
         }
         const data = await response.json();
-        
-        // Corregido: Acceder a la propiedad 'streams' del objeto de respuesta
         const categories = data.streams;
-
         if (!Array.isArray(categories)) {
             console.error('PPV.to: La propiedad "streams" no es un array como se esperaba.');
             return [];
         }
-
         const allPpvEvents = [];
         const now = Math.floor(Date.now() / 1000);
-
         categories.forEach(category => {
             if (Array.isArray(category.streams)) {
                 category.streams.forEach(stream => {
-                    // Procesar solo si el stream tiene un iframe
                     if (stream.iframe) {
+                        // Formatear la hora en 24hs y zona Buenos Aires
                         const eventDate = new Date(stream.starts_at * 1000);
+                        const time = eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
                         let status = 'Desconocido';
                         if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
                             status = 'En vivo';
                         }
-                        
                         allPpvEvents.push({
-                            time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false }),
+                            time: time,
                             title: stream.name,
                             options: [stream.iframe],
                             buttons: [stream.tag || 'Ver'],
@@ -480,7 +475,6 @@ async function fetchPpvToEvents() {
                 });
             }
         });
-
         console.log(`PPV.to: ${allPpvEvents.length} eventos procesados exitosamente.`);
         return allPpvEvents;
     } catch (error) {
