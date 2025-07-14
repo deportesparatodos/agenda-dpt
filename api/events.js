@@ -544,6 +544,7 @@ export default async (req, res) => {
         });
         
         const eventMap = new Map();
+        let ppvToCounter = 0;
         allEvents.forEach(event => {
             if (!event || !event.title) return;
 
@@ -555,7 +556,20 @@ export default async (req, res) => {
                 }
             }
 
-            const key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
+            // Clave base
+            let key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
+
+            // Si es PPV.to, aseguramos que nunca se sobrescriba ni sobrescriba otros
+            if (event.source === 'ppvto') {
+                // Si ya existe, agregamos un sufijo incremental
+                let uniqueKey = key;
+                while (eventMap.has(uniqueKey)) {
+                    ppvToCounter++;
+                    uniqueKey = `${key}__ppvto${ppvToCounter}`;
+                }
+                key = uniqueKey;
+            }
+
             if (!eventMap.has(key)) {
                 let buttonArr = [];
                 let optionsArr = [];
