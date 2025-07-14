@@ -430,65 +430,6 @@ async function fetchStreamedSuEvents(sportsMap) {
     }
 }
 
-/**
- * Obtiene eventos desde la API de ppv.to
- */
-async function fetchPpvToEvents() {
-    try {
-        console.log('Fetching PPV.to eventos...');
-        const response = await fetch('https://ppv.to/api/streams', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-        });
-        if (!response.ok) {
-            throw new Error(`PPV.to API error: ${response.status}`);
-        }
-        const data = await response.json();
-        
-        const categories = data.streams;
-
-        if (!Array.isArray(categories)) {
-            console.error('PPV.to: La propiedad "streams" no es un array como se esperaba.');
-            return [];
-        }
-
-        const allPpvEvents = [];
-        const now = Math.floor(Date.now() / 1000);
-
-        categories.forEach(category => {
-            if (Array.isArray(category.streams)) {
-                category.streams.forEach(stream => {
-                    if (stream.iframe) {
-                        const eventDate = new Date(stream.starts_at * 1000);
-                        let status = 'Desconocido';
-                        if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
-                            status = 'En vivo';
-                        }
-                        
-                        allPpvEvents.push({
-                            time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false }),
-                            title: stream.name,
-                            options: [stream.iframe],
-                            buttons: [stream.tag || 'Ver'],
-                            category: stream.category_name,
-                            language: 'Inglés',
-                            date: eventDate.toISOString().split('T')[0],
-                            source: 'ppvto',
-                            image: stream.poster,
-                            status: status,
-                        });
-                    }
-                });
-            }
-        });
-
-        console.log(`PPV.to: ${allPpvEvents.length} eventos procesados exitosamente.`);
-        return allPpvEvents;
-    } catch (error) {
-        console.error('Error al obtener eventos de PPV.to:', error.message);
-        return [];
-    }
-}
-
 
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
@@ -511,52 +452,37 @@ export default async (req, res) => {
         const alanGuloConfig = await getDynamicAlanGuloConfig();
         const sportsMap = await fetchStreamedSuSports();
         
-        const [streamTpEvents, alanGuloEvents, wacMotorsportsEvents, streamedSuEvents, ppvToEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacMotorsportsEvents, streamedSuEvents] = await Promise.allSettled([
             fetchStreamTpGlobalEvents(),
             fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchStreamedSuEvents(sportsMap),
-            fetchPpvToEvents()
+            fetchStreamedSuEvents(sportsMap)
         ]);
 
         const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
         const alanEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const newStreamedSuEvents = streamedSuEvents.status === 'fulfilled' ? streamedSuEvents.value : [];
-        const newPpvToEvents = ppvToEvents.status === 'fulfilled' ? ppvToEvents.value : [];
         
         if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
         if (streamedSuEvents.status === 'rejected') console.error('Streamed.su falló:', streamedSuEvents.reason);
-        if (ppvToEvents.status === 'rejected') console.error('PPV.to falló:', ppvToEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingMotorsportsEvents, ...newStreamedSuEvents, ...newPpvToEvents];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingMotorsportsEvents, ...newStreamedSuEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
             console.warn('No se obtuvieron eventos de ninguna fuente');
             return res.status(200).json([]);
         }
-
-        // Crear un mapa de posters de PPV.to por categoría
-        const ppvPosterMap = new Map();
-        newPpvToEvents.forEach(event => {
-            if (event.category && event.image && !ppvPosterMap.has(event.category.toLowerCase())) {
-                ppvPosterMap.set(event.category.toLowerCase(), event.image);
-            }
-        });
         
         const eventMap = new Map();
         allEvents.forEach(event => {
             if (!event || !event.title) return;
 
-            // Lógica de asignación de imágenes
-            if (!event.image) { // Si el evento no tiene imagen
-                const categoryKey = event.category?.toLowerCase();
-                if (categoryKey && ppvPosterMap.has(categoryKey)) {
-                    event.image = ppvPosterMap.get(categoryKey); // Usar poster de ppv.to si la categoría coincide
-                }
+            if (event.source !== 'streamedsu') {
+                event.image = DEFAULT_IMAGE;
             }
 
             const key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
@@ -571,9 +497,6 @@ export default async (req, res) => {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
                 } else if (event.source === 'streamedsu' && Array.isArray(event.options)) {
-                    buttonArr = event.buttons;
-                    optionsArr = event.options;
-                } else if (event.source === 'ppvto' && Array.isArray(event.options)) {
                     buttonArr = event.buttons;
                     optionsArr = event.options;
                 } else if (event.button) {
