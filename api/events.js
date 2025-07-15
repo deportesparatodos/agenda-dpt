@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
+import puppeteer from 'puppeteer';
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
@@ -107,26 +108,37 @@ async function fetchWeAreCheckingMotorsportsEvents() {
 }
 
 /**
- * Obtiene eventos desde la API de ppvs.su
+ * Obtiene eventos desde la API de ppvs.su usando Puppeteer para evitar el bloqueo de Cloudflare.
  */
 async function fetchPpvSuEvents() {
+    let browser;
     try {
-        console.log('Fetching PPVS.su eventos...');
-        const response = await fetch('https://ppvs.su/api/streams', {
-            headers: { 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': 'https://ppvs.su/'
-            },
+        console.log('[PPVS.su] Iniciando Puppeteer para evitar Cloudflare...');
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
-        if (!response.ok) {
-            const errorBody = await response.text();
-            throw new Error(`PPVS.su API error: ${response.status} ${response.statusText} - Body: ${errorBody}`);
-        }
-        const data = await response.json();
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
+
+        console.log('[PPVS.su] Navegando a la API...');
+        const response = await page.goto('https://ppvs.su/api/streams', { waitUntil: 'networkidle0', timeout: 25000 });
         
-        const categories = data.streams;
+        if (!response.ok()) {
+             throw new Error(`PPVS.su API error: ${response.status()} ${response.statusText()}`);
+        }
+
+        const content = await page.content();
+        // El contenido de la página después de que JS se ejecuta es el JSON.
+        // Lo extraemos del body y lo parseamos.
+        const jsonData = await page.evaluate(() => {
+            return JSON.parse(document.querySelector('body').innerText);
+        });
+
+        await browser.close();
+        console.log('[PPVS.su] Navegador cerrado. Datos obtenidos.');
+
+        const categories = jsonData.streams;
 
         if (!Array.isArray(categories)) {
             console.error('PPVS.su: La propiedad "streams" no es un array como se esperaba.');
@@ -167,6 +179,9 @@ async function fetchPpvSuEvents() {
         return allPpvEvents;
     } catch (error) {
         console.error('Error al obtener eventos de PPVS.su:', error.message);
+        if (browser) {
+            await browser.close();
+        }
         return [];
     }
 }
