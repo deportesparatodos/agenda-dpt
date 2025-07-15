@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
 // Importar los paquetes correctos para el entorno de Vercel
-import chrome from 'chrome-aws-lambda';
+import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 
 
@@ -118,13 +118,12 @@ async function fetchPpvSuEvents() {
     try {
         console.log('[PPVS.su] Iniciando Puppeteer para evitar Cloudflare...');
         
-        // Opciones para lanzar Puppeteer con chrome-aws-lambda
-        const executablePath = await chrome.executablePath;
-        
         browser = await puppeteer.launch({
-            args: chrome.args,
-            executablePath,
-            headless: chrome.headless,
+            args: chromium.args,
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
+            ignoreHTTPSErrors: true,
         });
 
         const page = await browser.newPage();
