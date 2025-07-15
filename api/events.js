@@ -4,8 +4,11 @@ import fs from 'fs';
 import path from 'path';
 // Importar los paquetes correctos para el entorno de Vercel
 import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-core';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
+// Aplicar el plugin de stealth a puppeteer
+puppeteer.use(StealthPlugin());
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
