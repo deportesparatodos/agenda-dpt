@@ -2,7 +2,10 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
-import puppeteer from 'puppeteer';
+// Importar los paquetes correctos para el entorno de Vercel
+import chrome from 'chrome-aws-lambda';
+import puppeteer from 'puppeteer-core';
+
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
@@ -111,13 +114,19 @@ async function fetchWeAreCheckingMotorsportsEvents() {
  * Obtiene eventos desde la API de ppvs.su usando Puppeteer para evitar el bloqueo de Cloudflare.
  */
 async function fetchPpvSuEvents() {
-    let browser;
+    let browser = null;
     try {
         console.log('[PPVS.su] Iniciando Puppeteer para evitar Cloudflare...');
+        
+        // Opciones para lanzar Puppeteer con chrome-aws-lambda
+        const executablePath = await chrome.executablePath;
+        
         browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: chrome.args,
+            executablePath,
+            headless: chrome.headless,
         });
+
         const page = await browser.newPage();
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
 
@@ -128,15 +137,11 @@ async function fetchPpvSuEvents() {
              throw new Error(`PPVS.su API error: ${response.status()} ${response.statusText()}`);
         }
 
-        const content = await page.content();
-        // El contenido de la página después de que JS se ejecuta es el JSON.
-        // Lo extraemos del body y lo parseamos.
         const jsonData = await page.evaluate(() => {
             return JSON.parse(document.querySelector('body').innerText);
         });
-
-        await browser.close();
-        console.log('[PPVS.su] Navegador cerrado. Datos obtenidos.');
+        
+        console.log('[PPVS.su] Datos obtenidos.');
 
         const categories = jsonData.streams;
 
@@ -179,10 +184,12 @@ async function fetchPpvSuEvents() {
         return allPpvEvents;
     } catch (error) {
         console.error('Error al obtener eventos de PPVS.su:', error.message);
+        return [];
+    } finally {
         if (browser) {
             await browser.close();
+            console.log('[PPVS.su] Navegador cerrado.');
         }
-        return [];
     }
 }
 
