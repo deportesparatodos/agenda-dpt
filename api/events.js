@@ -113,10 +113,16 @@ async function fetchPpvSuEvents() {
     try {
         console.log('Fetching PPVS.su eventos...');
         const response = await fetch('https://ppvs.su/api/streams', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://ppvs.su/'
+            },
         });
         if (!response.ok) {
-            throw new Error(`PPVS.su API error: ${response.status}`);
+            const errorBody = await response.text();
+            throw new Error(`PPVS.su API error: ${response.status} ${response.statusText} - Body: ${errorBody}`);
         }
         const data = await response.json();
         
