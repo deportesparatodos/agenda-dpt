@@ -6,35 +6,6 @@ import path from 'path';
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
 /**
- * Función para hacer scraping de streamtpglobal.com
- */
-async function fetchStreamTpGlobalEvents() {
-    try {
-        console.log('Fetching StreamTpGlobal eventos JSON...');
-        const response = await fetch('https://streamtpglobal.com/eventos.json', {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            timeout: 10000
-        });
-        
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        
-        const events = await response.json();
-        console.log(`StreamTpGlobal: ${events.length} eventos obtenidos.`);
-        
-        return events.map(event => ({
-            ...event,
-            source: 'streamtpglobal',
-            category: 'Otros'
-        }));
-    } catch (error) {
-        console.error('Error al obtener eventos de StreamTpGlobal:', error);
-        return [];
-    }
-}
-
-/**
  * Scrapea los links de cada evento de wearechecking.online
  */
 async function fetchWACLinksForEvent(eventUrl) {
@@ -136,135 +107,60 @@ async function fetchWeAreCheckingMotorsportsEvents() {
 }
 
 /**
- * Obtiene el mapa de categorías de deportes desde streamed.su
+ * Obtiene eventos desde la API de ppvs.su
  */
-async function fetchStreamedSuSports() {
+async function fetchPpvSuEvents() {
     try {
-        console.log('Fetching Streamed.su sports categories...');
-        const response = await fetch('https://streamed.su/api/sports');
+        console.log('Fetching PPVS.su eventos...');
+        const response = await fetch('https://ppvs.su/api/streams', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+        });
         if (!response.ok) {
-            throw new Error(`Streamed.su API error for sports: ${response.status}`);
+            throw new Error(`PPVS.su API error: ${response.status}`);
         }
-        const sports = await response.json();
-        const sportsMap = new Map();
-        sports.forEach(sport => sportsMap.set(sport.id, sport.name));
-        console.log('Streamed.su sports categories loaded.');
-        return sportsMap;
-    } catch (error) {
-        console.error('Error fetching Streamed.su sports categories:', error.message);
-        return new Map(); // Devuelve un mapa vacío en caso de error
-    }
-}
+        const data = await response.json();
+        
+        const categories = data.streams;
 
-
-/**
- * Obtiene eventos en vivo desde la API de streamed.su
- */
-async function fetchStreamedSuEvents(sportsMap) {
-    try {
-        console.log('Fetching Streamed.su live and today matches...');
-        const [liveResponse, todayResponse] = await Promise.allSettled([
-            fetch('https://streamed.su/api/matches/live', { headers: { 'User-Agent': 'Mozilla/5.0' } }),
-            fetch('https://streamed.su/api/matches/all-today', { headers: { 'User-Agent': 'Mozilla/5.0' } })
-        ]);
-
-        const matchesMap = new Map();
-
-        // Procesar eventos en vivo
-        if (liveResponse.status === 'fulfilled' && liveResponse.value.ok) {
-            const liveMatches = await liveResponse.value.json();
-            liveMatches.forEach(match => {
-                matchesMap.set(match.id, { ...match, computedStatus: 'En vivo' });
-            });
-        } else {
-            console.error('Failed to fetch live matches from Streamed.su');
+        if (!Array.isArray(categories)) {
+            console.error('PPVS.su: La propiedad "streams" no es un array como se esperaba.');
+            return [];
         }
 
-        // Procesar eventos de hoy
-        if (todayResponse.status === 'fulfilled' && todayResponse.value.ok) {
-            const todayMatches = await todayResponse.value.json();
-            todayMatches.forEach(match => {
-                if (!matchesMap.has(match.id)) { // No sobreescribir si ya está como "En vivo"
-                    const now = new Date();
-                    const eventDate = new Date(match.date);
-                    const status = eventDate > now ? 'Próximo' : 'Finalizado';
-                    matchesMap.set(match.id, { ...match, computedStatus: status });
-                }
-            });
-        } else {
-            console.error('Failed to fetch today\'s matches from Streamed.su');
-        }
+        const allPpvEvents = [];
+        const now = Math.floor(Date.now() / 1000);
 
-        const uniqueMatches = Array.from(matchesMap.values());
-        console.log(`Streamed.su: ${uniqueMatches.length} total matches found for today/live.`);
-
-        // Procesar todos los partidos para crear los eventos
-        const eventPromises = uniqueMatches.map(async (match) => {
-            try {
-                if (!match.sources || match.sources.length === 0) return null;
-
-                const streamSourcesPromises = match.sources.map(source =>
-                    fetch(`https://streamed.su/api/stream/${source.source}/${source.id}`, {
-                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-                        timeout: 10000
-                    })
-                    .then(res => res.ok ? res.json() : [])
-                    .catch(() => [])
-                );
-
-                const streamSourcesArrays = await Promise.all(streamSourcesPromises);
-                const allStreams = streamSourcesArrays.flat().filter(s => s && s.embedUrl);
-
-                if (allStreams.length === 0) return null;
-
-                const eventDate = new Date(match.date);
-                
-                const time = match.computedStatus === 'En vivo' ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
-
-                // Lógica de imágenes con la prioridad correcta
-                let imageUrl = '';
-                if (match.teams?.home?.badge && match.teams?.away?.badge) {
-                    imageUrl = `https://streamed.su/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
-                } else if (match.poster) {
-                    imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
-                } else if (match.teams?.home?.badge) {
-                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.home.badge}.webp`;
-                } else if (match.teams?.away?.badge) {
-                    imageUrl = `https://streamed.su/api/images/badge/${match.teams.away.badge}.webp`;
-                }
-
-                const buttons = allStreams.map(stream => {
-                    let name = (stream.language || `Stream ${stream.streamNo}`).toUpperCase().trim();
-                    if (stream.hd) {
-                        name += ' HD';
+        categories.forEach(category => {
+            if (Array.isArray(category.streams)) {
+                category.streams.forEach(stream => {
+                    if (stream.iframe) {
+                        const eventDate = new Date(stream.starts_at * 1000);
+                        let status = 'Desconocido';
+                        if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
+                            status = 'En vivo';
+                        }
+                        
+                        allPpvEvents.push({
+                            time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false }),
+                            title: stream.name,
+                            options: [stream.iframe],
+                            buttons: [stream.tag || 'Ver'],
+                            category: stream.category_name,
+                            language: 'Inglés',
+                            date: eventDate.toISOString().split('T')[0],
+                            source: 'ppvsu',
+                            image: stream.poster,
+                            status: status,
+                        });
                     }
-                    return name;
                 });
-
-                return {
-                    time: time,
-                    title: match.title,
-                    options: allStreams.map(stream => stream.embedUrl),
-                    buttons: buttons,
-                    category: sportsMap.get(match.category) || 'Otros',
-                    language: [...new Set(allStreams.map(s => s.language).filter(Boolean))].join(', ') || 'N/A',
-                    date: eventDate.toISOString().split('T')[0],
-                    source: 'streamedsu',
-                    image: imageUrl,
-                    status: match.computedStatus,
-                };
-            } catch (error) {
-                console.error(`Error procesando partido de Streamed.su "${match.title}":`, error);
-                return null;
             }
         });
 
-        const events = (await Promise.all(eventPromises)).filter(Boolean);
-        console.log(`Streamed.su: ${events.length} eventos procesados exitosamente.`);
-        return events;
-
+        console.log(`PPVS.su: ${allPpvEvents.length} eventos procesados exitosamente.`);
+        return allPpvEvents;
     } catch (error) {
-        console.error('Error al obtener eventos de Streamed.su:', error.message);
+        console.error('Error al obtener eventos de PPVS.su:', error.message);
         return [];
     }
 }
@@ -287,23 +183,19 @@ export default async (req, res) => {
 
     try {
         console.log('Iniciando obtención de eventos...');
-        const sportsMap = await fetchStreamedSuSports();
         
-        const [streamTpEvents, wacMotorsportsEvents, streamedSuEvents] = await Promise.allSettled([
-            fetchStreamTpGlobalEvents(),
+        const [wacMotorsportsEvents, ppvSuEvents] = await Promise.allSettled([
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchStreamedSuEvents(sportsMap)
+            fetchPpvSuEvents()
         ]);
 
-        const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
-        const newStreamedSuEvents = streamedSuEvents.status === 'fulfilled' ? streamedSuEvents.value : [];
+        const newPpvSuEvents = ppvSuEvents.status === 'fulfilled' ? ppvSuEvents.value : [];
         
-        if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
-        if (streamedSuEvents.status === 'rejected') console.error('Streamed.su falló:', streamedSuEvents.reason);
+        if (ppvSuEvents.status === 'rejected') console.error('PPVS.su falló:', ppvSuEvents.reason);
 
-        const allEvents = [...streamEvents, ...wearecheckingMotorsportsEvents, ...newStreamedSuEvents];
+        const allEvents = [...wearecheckingMotorsportsEvents, ...newPpvSuEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
@@ -315,22 +207,14 @@ export default async (req, res) => {
         allEvents.forEach(event => {
             if (!event || !event.title) return;
 
-            if (event.source !== 'streamedsu') {
-                event.image = DEFAULT_IMAGE;
-            }
-
             const key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
             if (!eventMap.has(key)) {
                 let buttonArr = [];
                 let optionsArr = [];
-                if (event.source === 'streamtpglobal' && event.link) {
-                    const match = event.link.match(/[?&]stream=([^&#]+)/i);
-                    buttonArr = [match ? match[1].toUpperCase() : 'CANAL'];
-                    optionsArr = [event.link];
-                } else if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
+                if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
-                } else if (event.source === 'streamedsu' && Array.isArray(event.options)) {
+                } else if (event.source === 'ppvsu' && Array.isArray(event.options)) {
                     buttonArr = event.buttons;
                     optionsArr = event.options;
                 } else if (event.button) {
