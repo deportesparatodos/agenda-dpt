@@ -2,10 +2,10 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
-// Importar los paquetes correctos para el entorno de Vercel
-import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+// Usar require para los paquetes de Puppeteer para mejorar la compatibilidad con Vercel
+const chromium = require('@sparticuz/chromium');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 // Aplicar el plugin de stealth a puppeteer
 puppeteer.use(StealthPlugin());
