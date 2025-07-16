@@ -1,189 +1,136 @@
 import fetch from 'node-fetch';
-import * as cheerio from 'cheerio';
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
 /**
- * Función para hacer scraping de ppvs.su
+ * Función para obtener eventos desde ppvs.su
  */
 async function fetchPpvsSuEvents() {
     try {
-        console.log('Fetching ppvs.su eventos JSON...');
+        console.log('Fetching PPVS.su eventos...');
+        
         const response = await fetch('https://ppvs.su/api/streams', {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
             },
-            timeout: 10000
+            timeout: 15000
         });
         
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        
-        const data = await response.json();
-        const events = [];
-        
-        if (data.success && data.streams) {
-            data.streams.forEach(category => {
-                if (category.streams) {
-                    category.streams.forEach(stream => {
-                        const eventDate = new Date(stream.starts_at * 1000);
-                        const endDate = new Date(stream.ends_at * 1000);
-                        const now = new Date();
-                        
-                        // Verificar si el evento está en vivo o próximo
-                        const isLive = now >= eventDate && now <= endDate;
-                        const isUpcoming = eventDate > now;
-                        
-                        if (isLive || isUpcoming) {
-                            const time = isLive ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { 
-                                hour: '2-digit', 
-                                minute: '2-digit', 
-                                timeZone: 'America/Argentina/Buenos_Aires', 
-                                hour12: false 
-                            });
-                            
-                            events.push({
-                                time,
-                                title: stream.name,
-                                link: stream.iframe,
-                                button: stream.tag || 'CANAL',
-                                category: stream.category_name || 'Otros',
-                                language: 'Inglés',
-                                date: eventDate.toISOString().split('T')[0],
-                                source: 'ppvs.su',
-                                image: stream.poster || DEFAULT_IMAGE,
-                                status: isLive ? 'En vivo' : 'Próximo',
-                                viewers: stream.viewers || '0'
-                            });
-                        }
-                    });
-                }
-            });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
-        console.log(`ppvs.su: ${events.length} eventos obtenidos.`);
-        return events;
-    } catch (error) {
-        console.error('Error al obtener eventos de ppvs.su:', error);
-        return [];
-    }
-}
-
-/**
- * Scrapea los links de cada evento de wearechecking.online
- */
-async function fetchWACLinksForEvent(eventUrl) {
-    try {
-        const response = await fetch(eventUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            timeout: 15000
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const data = await response.json();
+        console.log(`PPVS.su: Respuesta recibida con ${data.streams ? data.streams.length : 0} streams`);
         
-        const html = await response.text();
-        const $ = cheerio.load(html);
-        const options = [];
+        if (!data.streams || !Array.isArray(data.streams)) {
+            console.warn('PPVS.su: No se encontraron streams en la respuesta');
+            return [];
+        }
         
-        $('.feed-buttons-wrapper .feed-button').each((i, btn) => {
-            const onclick = $(btn).attr('onclick') || '';
-            const match = onclick.match(/src = '([^']+)'/);
-            const link = match ? match[1] : '';
-            const name = $(btn).find('p').text().trim() || 'Canal';
-            if (link) {
-                options.push({ name, link });
-            }
-        });
-        
-        return options;
-    } catch (error) {
-        console.error('Error al obtener links de evento WAC:', eventUrl, error);
-        return [];
-    }
-}
-
-/**
- * Scrapea eventos en vivo de wearechecking.online/streams-pages/motorsports
- */
-async function fetchWeAreCheckingMotorsportsEvents() {
-    try {
-        const url = 'https://wearechecking.online/streams-pages/motorsports';
-        console.log('Fetching WeAreChecking Motorsports eventos desde', url);
-        
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            timeout: 15000
-        });
-        
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        
-        const html = await response.text();
-        const $ = cheerio.load(html);
         const events = [];
-        const eventPromises = [];
         
-        $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
-            const $wrapper = $(el);
-            // Extraer la imagen de la card actual
-            const imageSrc = $wrapper.find('.stream-thumb').attr('src');
-            let imageUrl = DEFAULT_IMAGE; // Usar imagen por defecto como fallback
-            if (imageSrc) {
-                // Construir la URL absoluta
-                imageUrl = `https://wearechecking.online/${imageSrc.replace(/^\.\.\//, '')}`;
+        // Procesar cada categoría de streams
+        data.streams.forEach(category => {
+            if (!category.streams || !Array.isArray(category.streams)) {
+                return;
             }
-
-            $wrapper.find('.stream-feed[onclick]').each((j, feedEl) => {
-                const $feed = $(feedEl);
-                const onclick = $feed.attr('onclick');
-                const match = onclick ? onclick.match(/location\.href='([^']+)'/) : null;
-                const link = match ? `https://wearechecking.online${match[1]}` : '';
-                const $p = $feed.find('p');
-                
-                if ($p.length === 0 || /No events/i.test($p.text())) return;
-                
-                let time = '-';
-                let title = $p.text().trim();
-                const $span = $p.find('.unix-timestamp');
-                
-                if ($span.length) {
-                    let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
-                    time = spanText;
-                    title = $p.text().replace($span.text(), '').replace(/^\s*￨\s*/, '').replace(/^\s*\|\s*/, '').trim();
+            
+            category.streams.forEach(stream => {
+                try {
+                    // Convertir timestamps a fechas legibles
+                    const startDate = new Date(stream.starts_at * 1000);
+                    const endDate = new Date(stream.ends_at * 1000);
+                    const now = new Date();
+                    
+                    // Determinar si está en vivo
+                    const isLive = now >= startDate && now <= endDate;
+                    const status = isLive ? 'En vivo' : 'Próximo';
+                    
+                    // Formatear hora
+                    const time = isLive ? 'En vivo' : startDate.toLocaleTimeString('es-AR', { 
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        timeZone: 'America/Argentina/Buenos_Aires', 
+                        hour12: false 
+                    });
+                    
+                    // Construir el evento
+                    const event = {
+                        time: time,
+                        title: stream.name || 'Sin título',
+                        options: [stream.iframe || ''], // URL del iframe
+                        buttons: [stream.tag || 'CANAL'], // Etiqueta del canal
+                        category: category.category || 'Otros',
+                        language: 'Desconocido', // PPVS.su no parece incluir idioma
+                        date: startDate.toISOString().split('T')[0],
+                        source: 'ppvs.su',
+                        image: stream.poster || DEFAULT_IMAGE,
+                        status: status,
+                        viewers: stream.viewers || '0',
+                        starts_at: stream.starts_at,
+                        ends_at: stream.ends_at,
+                        always_live: stream.always_live || 0
+                    };
+                    
+                    // Solo agregar si tiene iframe válido
+                    if (stream.iframe && stream.iframe.trim() !== '') {
+                        events.push(event);
+                    }
+                    
+                } catch (error) {
+                    console.error(`Error procesando stream "${stream.name}":`, error);
                 }
-                
-                const eventObj = {
-                    time,
-                    title,
-                    link,
-                    button: 'WAC',
-                    category: 'Motor Sports',
-                    language: 'Inglés',
-                    date: new Date().toISOString().split('T')[0],
-                    source: 'wearechecking-motorsports',
-                    image: imageUrl,
-                    options: []
-                };
-                
-                const p = fetchWACLinksForEvent(link).then(options => {
-                    eventObj.options = options;
-                    return eventObj;
-                });
-                eventPromises.push(p);
             });
         });
         
-        const results = await Promise.all(eventPromises);
-        return results.filter(ev => ev.options && ev.options.length > 0);
+        console.log(`PPVS.su: ${events.length} eventos procesados exitosamente`);
+        return events;
+        
     } catch (error) {
-        console.error('Error al obtener eventos de WeAreChecking Motorsports:', error);
+        console.error('Error al obtener eventos de ppvs.su:', error);
+        
+        // Si es error 403, intentar con headers más básicos
+        if (error.message.includes('403')) {
+            console.log('Reintentando con headers básicos...');
+            try {
+                const response = await fetch('https://ppvs.su/api/streams', {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; API Client)',
+                        'Accept': 'application/json'
+                    },
+                    timeout: 10000
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Reintento exitoso con headers básicos');
+                    // Procesar la respuesta aquí también si es necesario
+                    return [];
+                }
+            } catch (retryError) {
+                console.error('Reintento también falló:', retryError);
+            }
+        }
+        
         return [];
     }
 }
 
-// --- FUNCIÓN PRINCIPAL EXPORTADA ---
+/**
+ * Función principal de la API
+ */
 export default async (req, res) => {
+    // Headers CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -198,93 +145,33 @@ export default async (req, res) => {
     }
 
     try {
-        console.log('Iniciando obtención de eventos...');
+        console.log('Iniciando obtención de eventos desde PPVS.su...');
         
-        const [ppvsEvents, wacMotorsportsEvents] = await Promise.allSettled([
-            fetchPpvsSuEvents(),
-            fetchWeAreCheckingMotorsportsEvents()
-        ]);
-
-        const ppvsEventsArray = ppvsEvents.status === 'fulfilled' ? ppvsEvents.value : [];
-        const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
+        const events = await fetchPpvsSuEvents();
         
-        if (ppvsEvents.status === 'rejected') console.error('ppvs.su falló:', ppvsEvents.reason);
-        if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
-
-        const allEvents = [...ppvsEventsArray, ...wearecheckingMotorsportsEvents];
-        console.log(`Total eventos combinados: ${allEvents.length}`);
-        
-        if (allEvents.length === 0) {
-            console.warn('No se obtuvieron eventos de ninguna fuente');
+        if (events.length === 0) {
+            console.warn('No se obtuvieron eventos de PPVS.su');
             return res.status(200).json([]);
         }
         
-        const eventMap = new Map();
-        allEvents.forEach(event => {
-            if (!event || !event.title) return;
-
-            event.image = event.image || DEFAULT_IMAGE;
-
-            const key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
-            if (!eventMap.has(key)) {
-                let buttonArr = [];
-                let optionsArr = [];
-                
-                if (event.source === 'ppvs.su' && event.link) {
-                    buttonArr = [event.button || 'CANAL'];
-                    optionsArr = [event.link];
-                } else if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
-                    buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
-                    optionsArr = event.options.map(opt => opt.link);
-                } else if (event.button) {
-                    buttonArr = [event.button];
-                    optionsArr = [event.link];
-                } else {
-                    optionsArr = [event.link];
-                }
-                
-                eventMap.set(key, {
-                    time: event.time || '-',
-                    title: event.title || 'Sin título',
-                    options: optionsArr,
-                    buttons: buttonArr,
-                    category: event.category || 'Otros',
-                    language: event.language || 'Desconocido',
-                    date: event.date || new Date().toISOString().split('T')[0],
-                    source: event.source || 'unknown',
-                    image: event.image || DEFAULT_IMAGE,
-                    status: event.status || 'Desconocido',
-                    viewers: event.viewers || '0'
-                });
-            } else {
-                const existing = eventMap.get(key);
-                if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options)) {
-                    event.options.forEach(opt => {
-                        if (!existing.options.includes(opt.link)) {
-                            existing.options.push(opt.link);
-                            existing.buttons.push(opt.name.toUpperCase());
-                        }
-                    });
-                } else if (event.link && !existing.options.includes(event.link)) {
-                    existing.options.push(event.link);
-                    if (event.button) existing.buttons.push(event.button);
-                }
-            }
-        });
-
-        let adaptedEvents = Array.from(eventMap.values());
+        // Filtrar y ordenar eventos
+        const filteredEvents = events
+            .filter(event => event.options && event.options.length > 0 && event.options[0])
+            .sort((a, b) => {
+                // Primero eventos en vivo, luego por hora de inicio
+                if (a.status === 'En vivo' && b.status !== 'En vivo') return -1;
+                if (b.status === 'En vivo' && a.status !== 'En vivo') return 1;
+                return a.starts_at - b.starts_at;
+            });
         
-        // Asegurar que todos los eventos tengan una imagen
-        adaptedEvents = adaptedEvents.map(event => {
-            if (!event.image) {
-                event.image = DEFAULT_IMAGE;
-            }
-            return event;
-        });
+        console.log(`Devolviendo ${filteredEvents.length} eventos válidos`);
+        return res.status(200).json(filteredEvents);
         
-        return res.status(200).json(adaptedEvents);
     } catch (error) {
         console.error('Error en la función principal:', error);
-        return res.status(500).json({ error: 'Error interno del servidor' });
+        return res.status(500).json({ 
+            error: 'Error interno del servidor',
+            details: error.message 
+        });
     }
 };
