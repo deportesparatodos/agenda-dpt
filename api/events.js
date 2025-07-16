@@ -1,18 +1,224 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
-import fs from 'fs';
-import path from 'path';
-// Usar import para todos los paquetes, que es lo correcto para tu proyecto
-import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import UserDataDir from 'puppeteer-extra-plugin-user-data-dir';
-
-// Aplicar los plugins de forma explícita para configurar el de user-data-dir
-puppeteer.use(StealthPlugin());
-puppeteer.use(UserDataDir({ deleteOnExit: false })); // Desactivar el borrado automático para evitar errores en Vercel
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
+
+/**
+ * PRIMER PASO: Scrapea y devuelve la lista de canales desde la web (en memoria, no guarda archivo).
+ */
+async function fetchChannelsObject() {
+    const url = 'https://alangulotv.space/canal/';
+    console.log(`[SCRAPER] Iniciando actualización de canales desde: ${url}`);
+    try {
+        const response = await fetch(url, { 
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`Error al acceder a la página de canales. Estado: ${response.status}`);
+        }
+        const html = await response.text();
+        const regex = /const\s+channels\s*=\s*(\{[\s\S]*?\});/;
+        const match = html.match(regex);
+        if (match && match[1]) {
+            let channelsObjectString = match[1];
+            let parsedObject;
+            try {
+                // eslint-disable-next-line no-eval
+                parsedObject = eval('(' + channelsObjectString + ')');
+            } catch (e) {
+                console.error('[SCRAPER] Error al evaluar el objeto channels:', e);
+                return { canales: {} };
+            }
+            console.log(`[SCRAPER] ¡Éxito! Canales obtenidos en memoria.`);
+            return { canales: parsedObject };
+        } else {
+            console.error("[SCRAPER] No se pudo encontrar el objeto 'const channels' en el HTML.");
+            return { canales: {} };
+        }
+    } catch (error) {
+        console.error("[SCRAPER] Falló la actualización de canales.", error.message);
+        return { canales: {} };
+    }
+}
+
+/**
+ * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
+ */
+async function getDynamicAlanGuloConfig() {
+    const mainUrl = 'https://alangulotv.live';
+    try {
+        const response = await fetch(mainUrl, {
+            redirect: 'follow',
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
+        const finalUrl = new URL(response.url);
+        const baseDomain = finalUrl.hostname;
+        const linkDomain = `p.${baseDomain}`;
+        const agendaUrl = `https://${baseDomain}/agenda-2/`;
+        const baseOrigin = `https://${baseDomain}`;
+
+        console.log(`Dominio de AlanGuloTV detectado: ${baseDomain}`);
+        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
+    } catch (error) {
+        console.error('No se pudo obtener el dominio dinámico de AlanGuloTV. Usando valores por defecto.', error);
+        const baseDomain = 'alangulotv.space';
+        const linkDomain = `p.${baseDomain}`;
+        const agendaUrl = `https://${baseDomain}/agenda-2/`;
+        const baseOrigin = `https://${baseDomain}`;
+        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
+    }
+}
+
+/**
+ * Función para hacer scraping de streamtpglobal.com
+ */
+async function fetchStreamTpGlobalEvents() {
+    try {
+        console.log('Fetching StreamTpGlobal eventos JSON...');
+        const response = await fetch('https://streamtpglobal.com/eventos.json', {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            timeout: 10000
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
+        const events = await response.json();
+        console.log(`StreamTpGlobal: ${events.length} eventos obtenidos.`);
+        
+        return events.map(event => ({
+            ...event,
+            source: 'streamtpglobal',
+            category: 'Otros'
+        }));
+    } catch (error) {
+        console.error('Error al obtener eventos de StreamTpGlobal:', error);
+        return [];
+    }
+}
+
+/**
+ * Función para hacer scraping de alangulotv usando Cheerio
+ */
+async function fetchAlanGuloTVEvents(config) {
+    const agendaUrl = 'https://alangulotv.me/agenda-2/';
+    const linkDomain = 'p.alangulotv.space';
+    try {
+        console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
+        const response = await fetch(agendaUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            timeout: 15000
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        const events = [];
+        const eventPromises = [];
+        
+        $('.match-container').each((index, element) => {
+            try {
+                const $container = $(element);
+                let imageUrl = $container.find('img.event-logo').attr('src') || '';
+                if (!imageUrl) {
+                    imageUrl = $container.find('img.team-logo').first().attr('src') || '';
+                }
+                if (imageUrl && imageUrl.startsWith('/')) {
+                    imageUrl = `https://${linkDomain}${imageUrl}`;
+                }
+                const time = $container.find('.time').text().trim() || '-';
+                const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
+                const title = teamNames.length > 1 ? `${teamNames[0]} vs ${teamNames[1]}` : teamNames[0] || 'Evento sin título';
+                
+                if (title.toUpperCase().includes('MLB')) {
+                    imageUrl = `https://${linkDomain}/mlb`;
+                }
+                
+                const $linksContainer = $container.next('.links-container');
+                if ($linksContainer.length > 0) {
+                    $linksContainer.find('.link-button, a').each((i, linkEl) => {
+                        const $link = $(linkEl);
+                        const href = $link.attr('href');
+                        const buttonName = $link.text().trim() || 'CANAL';
+                        
+                        if (href) {
+                            let eventPageUrl = href.startsWith('http') ? href : `https://alangulotv.me${href}`;
+                            const pathParts = href.split('/').filter(part => part.length > 0);
+                            const linkKey = pathParts[pathParts.length - 1];
+                            
+                            const p = (async () => {
+                                try {
+                                    const subRes = await fetch(eventPageUrl, {
+                                        headers: {
+                                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                        },
+                                        timeout: 15000
+                                    });
+                                    if (!subRes.ok) return;
+                                    
+                                    const subHtml = await subRes.text();
+                                    const channelsMatch = subHtml.match(/const\s+channels\s*=\s*(\{[\s\S]*?\});/);
+                                    
+                                    if (channelsMatch && channelsMatch[1]) {
+                                        let channelsObj;
+                                        try {
+                                            channelsObj = eval('(' + channelsMatch[1] + ')');
+                                        } catch (e) {
+                                            return;
+                                        }
+                                        
+                                        if (channelsObj[linkKey]) {
+                                            const channelData = channelsObj[linkKey];
+                                            const firstAvailableKey = Object.keys(channelData)[0];
+                                            if (firstAvailableKey) {
+                                                const finalLink = channelData[firstAvailableKey];
+                                                if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
+                                                    events.push({
+                                                        time,
+                                                        title,
+                                                        link: finalLink,
+                                                        button: buttonName,
+                                                        category: 'Otros',
+                                                        language: 'Español',
+                                                        date: new Date().toISOString().split('T')[0],
+                                                        source: 'alangulotv',
+                                                        image: imageUrl || DEFAULT_IMAGE
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    // Ignorar errores
+                                }
+                            })();
+                            eventPromises.push(p);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error procesando evento AlanGuloTV:', error);
+            }
+        });
+        
+        await Promise.all(eventPromises);
+        console.log(`AlanGuloTV: ${events.length} eventos obtenidos`);
+        return events;
+    } catch (error) {
+        console.error('Error al obtener eventos de AlanGuloTV:', error);
+        return [];
+    }
+}
 
 /**
  * Scrapea los links de cada evento de wearechecking.online
@@ -26,9 +232,11 @@ async function fetchWACLinksForEvent(eventUrl) {
             timeout: 15000
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
         const html = await response.text();
         const $ = cheerio.load(html);
         const options = [];
+        
         $('.feed-buttons-wrapper .feed-button').each((i, btn) => {
             const onclick = $(btn).attr('onclick') || '';
             const match = onclick.match(/src = '([^']+)'/);
@@ -38,6 +246,7 @@ async function fetchWACLinksForEvent(eventUrl) {
                 options.push({ name, link });
             }
         });
+        
         return options;
     } catch (error) {
         console.error('Error al obtener links de evento WAC:', eventUrl, error);
@@ -52,17 +261,21 @@ async function fetchWeAreCheckingMotorsportsEvents() {
     try {
         const url = 'https://wearechecking.online/streams-pages/motorsports';
         console.log('Fetching WeAreChecking Motorsports eventos desde', url);
+        
         const response = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
             timeout: 15000
         });
+        
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
         const eventPromises = [];
+        
         $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
             const $wrapper = $(el);
             // Extraer la imagen de la card actual
@@ -70,24 +283,28 @@ async function fetchWeAreCheckingMotorsportsEvents() {
             let imageUrl = DEFAULT_IMAGE; // Usar imagen por defecto como fallback
             if (imageSrc) {
                 // Construir la URL absoluta
-                imageUrl = `https://wearechecking.online/${imageSrc.replace(/..[\\/]/, '')}`;
+                imageUrl = `https://wearechecking.online/${imageSrc.replace(/^\.\.\//, '')}`;
             }
 
             $wrapper.find('.stream-feed[onclick]').each((j, feedEl) => {
                 const $feed = $(feedEl);
                 const onclick = $feed.attr('onclick');
-                const match = onclick ? onclick.match(/location.href='([^']+)'/) : null;
+                const match = onclick ? onclick.match(/location\.href='([^']+)'/) : null;
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
                 const $p = $feed.find('p');
+                
                 if ($p.length === 0 || /No events/i.test($p.text())) return;
+                
                 let time = '-';
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
+                
                 if ($span.length) {
-                     let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
-                     time = spanText;
-                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
+                    let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                    time = spanText;
+                    title = $p.text().replace($span.text(), '').replace(/^\s*￨\s*/, '').replace(/^\s*\|\s*/, '').trim();
                 }
+                
                 const eventObj = {
                     time,
                     title,
@@ -97,9 +314,10 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     language: 'Inglés',
                     date: new Date().toISOString().split('T')[0],
                     source: 'wearechecking-motorsports',
-                    image: imageUrl, // Usar la imagen de la card
+                    image: imageUrl,
                     options: []
                 };
+                
                 const p = fetchWACLinksForEvent(link).then(options => {
                     eventObj.options = options;
                     return eventObj;
@@ -107,6 +325,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 eventPromises.push(p);
             });
         });
+        
         const results = await Promise.all(eventPromises);
         return results.filter(ev => ev.options && ev.options.length > 0);
     } catch (error) {
@@ -116,290 +335,128 @@ async function fetchWeAreCheckingMotorsportsEvents() {
 }
 
 /**
- * Función para generar delay aleatorio entre acciones
+ * Obtiene el mapa de categorías de deportes desde streamed.su
  */
-function randomDelay(min = 1000, max = 3000) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-/**
- * Función para crear delay compatible con todas las versiones de Puppeteer
- */
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * Obtiene eventos desde la API de ppvs.su usando Puppeteer con mejor evasión
- */
-async function fetchPpvSuEvents() {
-    let browser = null;
+async function fetchStreamedSuSports() {
     try {
-        console.log('[PPVS.su] Iniciando Puppeteer con configuración avanzada...');
-        
-        // Configuración más robusta para evadir detección
-        const launchOptions = {
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                '--disable-background-networking',
-                '--disable-background-timer-throttling',
-                '--disable-renderer-backgrounding',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-ipc-flooding-protection',
-                '--disable-client-side-phishing-detection',
-                '--disable-component-extensions-with-background-pages',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-images',
-                '--disable-default-apps',
-                '--disable-sync',
-                '--disable-translate',
-                '--hide-scrollbars',
-                '--mute-audio',
-                '--no-first-run',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-features=TranslateUI',
-                '--disable-hang-monitor',
-                '--disable-prompt-on-repost',
-                '--disable-domain-reliability',
-                '--disable-component-update',
-                '--single-process',
-                '--disable-gpu',
-                '--disable-gpu-rasterization',
-                '--disable-gpu-sandbox',
-                '--disable-software-rasterizer',
-                '--disable-background-timer-throttling',
-                '--disable-renderer-backgrounding',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-field-trial-config',
-                '--disable-back-forward-cache',
-                '--memory-pressure-off',
-                '--max_old_space_size=4096'
-            ],
-            defaultViewport: {
-                width: 1920,
-                height: 1080,
-                deviceScaleFactor: 1,
-                hasTouch: false,
-                isLandscape: true,
-                isMobile: false,
+        console.log('Fetching Streamed.su sports categories...');
+        const response = await fetch('https://streamed.su/api/sports', {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
-            executablePath: await chromium.executablePath(),
-            headless: true,
-            ignoreHTTPSErrors: true,
-            ignoreDefaultArgs: ['--enable-automation'],
-            timeout: 30000,
-        };
-
-        // Usar chromium args si están disponibles
-        if (chromium.args) {
-            launchOptions.args = [...chromium.args, ...launchOptions.args];
-        }
-
-        browser = await puppeteer.launch(launchOptions);
-        const page = await browser.newPage();
-
-        // Configurar headers y propiedades adicionales
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        
-        await page.setExtraHTTPHeaders({
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-        });
-
-        // Ocultar propiedades de webdriver
-        await page.evaluateOnNewDocument(() => {
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined,
-            });
-            
-            // Eliminar propiedades de automatización
-            delete navigator.__proto__.webdriver;
-            
-            // Modificar plugins
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5],
-            });
-            
-            // Modificar languages
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['en-US', 'en'],
-            });
-        });
-
-        // Navegar directamente a la API - más simple y rápido
-        console.log('[PPVS.su] Navegando a la API...');
-        const response = await page.goto('https://ppvs.su/api/streams', { 
-            waitUntil: 'networkidle0', 
-            timeout: 25000 
+            timeout: 10000
         });
         
-        if (!response.ok()) {
-             throw new Error(`PPVS.su API error: ${response.status()} ${response.statusText()}`);
+        if (!response.ok) {
+            throw new Error(`Streamed.su API error for sports: ${response.status}`);
         }
-
-        // Esperar usando setTimeout nativo en lugar de page.waitForTimeout
-        await delay(randomDelay(500, 1500));
-
-        const jsonData = await page.evaluate(() => {
-            const bodyText = document.querySelector('body').innerText;
-            try {
-                return JSON.parse(bodyText);
-            } catch (e) {
-                console.error('Error parsing JSON:', e);
-                return null;
-            }
-        });
         
-        if (!jsonData) {
-            throw new Error('No se pudo parsear el JSON de la API');
-        }
-
-        console.log('[PPVS.su] Datos obtenidos exitosamente.');
-
-        const categories = jsonData.streams;
-
-        if (!Array.isArray(categories)) {
-            console.error('PPVS.su: La propiedad "streams" no es un array como se esperaba.');
-            return [];
-        }
-
-        const allPpvEvents = [];
-        const now = Math.floor(Date.now() / 1000);
-
-        categories.forEach(category => {
-            if (Array.isArray(category.streams)) {
-                category.streams.forEach(stream => {
-                    if (stream.iframe) {
-                        const eventDate = new Date(stream.starts_at * 1000);
-                        let status = 'Desconocido';
-                        if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
-                            status = 'En vivo';
-                        }
-                        
-                        allPpvEvents.push({
-                            time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false }),
-                            title: stream.name,
-                            options: [stream.iframe],
-                            buttons: [stream.tag || 'Ver'],
-                            category: stream.category_name,
-                            language: 'Inglés',
-                            date: eventDate.toISOString().split('T')[0],
-                            source: 'ppvsu',
-                            image: stream.poster,
-                            status: status,
-                        });
-                    }
-                });
-            }
-        });
-
-        console.log(`PPVS.su: ${allPpvEvents.length} eventos procesados exitosamente.`);
-        return allPpvEvents;
+        const sports = await response.json();
+        const sportsMap = new Map();
+        sports.forEach(sport => sportsMap.set(sport.id, sport.name));
+        console.log('Streamed.su sports categories loaded.');
+        return sportsMap;
     } catch (error) {
-        console.error('Error al obtener eventos de PPVS.su:', error.message);
-        return [];
-    } finally {
-        if (browser) {
-            try {
-                await browser.close();
-                console.log('[PPVS.su] Navegador cerrado.');
-            } catch (closeError) {
-                console.error('Error al cerrar navegador:', closeError.message);
-            }
-        }
+        console.error('Error fetching Streamed.su sports categories:', error.message);
+        return new Map();
     }
 }
 
 /**
- * Función alternativa usando fetch directo con rotación de User-Agents
+ * Obtiene eventos en vivo desde la API de streamed.su
  */
-async function fetchPpvSuEventsFallback() {
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0'
-    ];
-
+async function fetchStreamedSuEvents(sportsMap) {
     try {
-        console.log('[PPVS.su] Intentando fetch directo como fallback...');
-        const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
-        
-        const response = await fetch('https://ppvs.su/api/streams', {
-            headers: {
-                'User-Agent': randomUA,
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            },
+        // 1. Obtener IDs de los partidos EN VIVO
+        console.log('Fetching Streamed.su live match IDs...');
+        const liveMatchesResponse = await fetch('https://streamed.su/api/matches/live', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
             timeout: 15000
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const jsonData = await response.json();
         
-        // Procesar los datos igual que en la función principal
-        const categories = jsonData.streams;
-        if (!Array.isArray(categories)) {
-            return [];
-        }
+        if (!liveMatchesResponse.ok) throw new Error('Failed to fetch live matches');
+        
+        const liveMatches = await liveMatchesResponse.json();
+        const liveMatchIds = new Set(liveMatches.map(m => m.id));
+        console.log(`${liveMatchIds.size} live match IDs loaded.`);
 
-        const allPpvEvents = [];
-        const now = Math.floor(Date.now() / 1000);
+        // 2. Obtener TODOS los partidos
+        console.log('Fetching ALL Streamed.su matches...');
+        const allMatchesResponse = await fetch('https://streamed.su/api/matches/all', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            timeout: 20000
+        });
+        
+        if (!allMatchesResponse.ok) throw new Error('Failed to fetch all matches');
+        
+        const allMatches = await allMatchesResponse.json();
+        console.log(`Streamed.su: ${allMatches.length} total matches found.`);
 
-        categories.forEach(category => {
-            if (Array.isArray(category.streams)) {
-                category.streams.forEach(stream => {
-                    if (stream.iframe) {
-                        const eventDate = new Date(stream.starts_at * 1000);
-                        let status = 'Desconocido';
-                        if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
-                            status = 'En vivo';
-                        }
-                        
-                        allPpvEvents.push({
-                            time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false }),
-                            title: stream.name,
-                            options: [stream.iframe],
-                            buttons: [stream.tag || 'Ver'],
-                            category: stream.category_name,
-                            language: 'Inglés',
-                            date: eventDate.toISOString().split('T')[0],
-                            source: 'ppvsu',
-                            image: stream.poster,
-                            status: status,
-                        });
+        // 3. Procesar todos los partidos para crear los eventos
+        const eventPromises = allMatches.map(async (match) => {
+            try {
+                if (!match.sources || match.sources.length === 0) return null;
+
+                const streamSourcesPromises = match.sources.map(source =>
+                    fetch(`https://streamed.su/api/stream/${source.source}/${source.id}`, {
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+                        timeout: 10000
+                    })
+                    .then(res => res.ok ? res.json() : [])
+                    .catch(() => [])
+                );
+
+                const streamSourcesArrays = await Promise.all(streamSourcesPromises);
+                const allStreams = streamSourcesArrays.flat().filter(s => s && s.embedUrl);
+
+                if (allStreams.length === 0) return null;
+
+                const eventDate = new Date(match.date);
+                
+                const isLive = liveMatchIds.has(match.id);
+                const status = isLive ? 'En vivo' : 'Desconocido';
+                const time = isLive ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
+
+                // Lógica de imágenes con la prioridad correcta
+                let imageUrl = DEFAULT_IMAGE;
+                if (match.teams?.home?.badge && match.teams?.away?.badge) {
+                    imageUrl = `https://streamed.su/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
+                } else if (match.poster) {
+                    imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
+                }
+
+                const buttons = allStreams.map(stream => {
+                    let name = (stream.language || `Stream ${stream.streamNo}`).toUpperCase().trim();
+                    if (stream.hd) {
+                        name += ' HD';
                     }
+                    return name;
                 });
+
+                return {
+                    time: time,
+                    title: match.title,
+                    options: allStreams.map(stream => stream.embedUrl),
+                    buttons: buttons,
+                    category: sportsMap.get(match.category) || 'Otros',
+                    language: [...new Set(allStreams.map(s => s.language).filter(Boolean))].join(', ') || 'N/A',
+                    date: eventDate.toISOString().split('T')[0],
+                    source: 'streamedsu',
+                    image: imageUrl,
+                    status: status,
+                };
+            } catch (error) {
+                console.error(`Error procesando partido de Streamed.su "${match.title}":`, error);
+                return null;
             }
         });
 
-        console.log(`PPVS.su Fallback: ${allPpvEvents.length} eventos procesados.`);
-        return allPpvEvents;
+        const events = (await Promise.all(eventPromises)).filter(Boolean);
+        console.log(`Streamed.su: ${events.length} eventos procesados exitosamente.`);
+        return events;
+
     } catch (error) {
-        console.error('Error en fallback de PPVS.su:', error.message);
+        console.error('Error al obtener eventos de Streamed.su:', error.message);
         return [];
     }
 }
@@ -420,26 +477,29 @@ export default async (req, res) => {
     }
 
     try {
+        const canales = await fetchChannelsObject();
         console.log('Iniciando obtención de eventos...');
+        const alanGuloConfig = await getDynamicAlanGuloConfig();
+        const sportsMap = await fetchStreamedSuSports();
         
-        // Intentar primero con Puppeteer, si falla usar fallback
-        let ppvSuEventsPromise = fetchPpvSuEvents().catch(async (error) => {
-            console.log('Puppeteer falló, intentando fallback:', error.message);
-            return await fetchPpvSuEventsFallback();
-        });
-
-        const [wacMotorsportsEvents, ppvSuEvents] = await Promise.allSettled([
+        const [streamTpEvents, alanGuloEvents, wacMotorsportsEvents, streamedSuEvents] = await Promise.allSettled([
+            fetchStreamTpGlobalEvents(),
+            fetchAlanGuloTVEvents(alanGuloConfig, canales),
             fetchWeAreCheckingMotorsportsEvents(),
-            ppvSuEventsPromise
+            fetchStreamedSuEvents(sportsMap)
         ]);
 
+        const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
+        const alanEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
-        const newPpvSuEvents = ppvSuEvents.status === 'fulfilled' ? ppvSuEvents.value : [];
+        const newStreamedSuEvents = streamedSuEvents.status === 'fulfilled' ? streamedSuEvents.value : [];
         
+        if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
+        if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
-        if (ppvSuEvents.status === 'rejected') console.error('PPVS.su falló:', ppvSuEvents.reason);
+        if (streamedSuEvents.status === 'rejected') console.error('Streamed.su falló:', streamedSuEvents.reason);
 
-        const allEvents = [...wearecheckingMotorsportsEvents, ...newPpvSuEvents];
+        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingMotorsportsEvents, ...newStreamedSuEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
@@ -451,14 +511,23 @@ export default async (req, res) => {
         allEvents.forEach(event => {
             if (!event || !event.title) return;
 
+            if (event.source !== 'streamedsu') {
+                event.image = event.image || DEFAULT_IMAGE;
+            }
+
             const key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
             if (!eventMap.has(key)) {
                 let buttonArr = [];
                 let optionsArr = [];
-                if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
+                
+                if (event.source === 'streamtpglobal' && event.link) {
+                    const match = event.link.match(/[?&]stream=([^&#]+)/i);
+                    buttonArr = [match ? match[1].toUpperCase() : 'CANAL'];
+                    optionsArr = [event.link];
+                } else if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
-                } else if (event.source === 'ppvsu' && Array.isArray(event.options)) {
+                } else if (event.source === 'streamedsu' && Array.isArray(event.options)) {
                     buttonArr = event.buttons;
                     optionsArr = event.options;
                 } else if (event.button) {
@@ -467,6 +536,7 @@ export default async (req, res) => {
                 } else {
                     optionsArr = [event.link];
                 }
+                
                 eventMap.set(key, {
                     time: event.time || '-',
                     title: event.title || 'Sin título',
@@ -476,7 +546,7 @@ export default async (req, res) => {
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
                     source: event.source || 'unknown',
-                    image: event.image || '',
+                    image: event.image || DEFAULT_IMAGE,
                     status: event.status || 'Desconocido'
                 });
             } else {
@@ -497,6 +567,7 @@ export default async (req, res) => {
 
         let adaptedEvents = Array.from(eventMap.values());
         
+        // Asegurar que todos los eventos tengan una imagen
         adaptedEvents = adaptedEvents.map(event => {
             if (!event.image) {
                 event.image = DEFAULT_IMAGE;
