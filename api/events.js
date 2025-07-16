@@ -9,21 +9,18 @@ const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
  */
 async function fetchPpvsSuEvents() {
     // --- INICIO DE LA MODIFICACIÓN ---
-    // Se cambia a un proxy más robusto (cors.sh) que requiere una clave de API temporal
-    // para evitar los bloqueos que mostraban el mensaje "SEIZED".
-    const PROXY_URL = 'https://cors.sh/';
+    // El proxy anterior (cors.sh) está devolviendo un error 404. Cambiamos a otro
+    // proxy público (thingproxy.freeboard.io) para intentar solucionar el problema.
+    const PROXY_URL = 'https://thingproxy.freeboard.io/fetch/';
     const targetUrl = 'https://ppvs.su/api/streams';
     const url = `${PROXY_URL}${targetUrl}`;
     
-    console.log(`Obteniendo eventos desde ${targetUrl} a través del proxy cors.sh...`);
+    console.log(`Obteniendo eventos desde ${targetUrl} a través del proxy thingproxy...`);
     
     try {
-        // Se realiza la petición a través del nuevo proxy, añadiendo la cabecera de la API key temporal.
+        // Se realiza la petición a través del nuevo proxy. Este no requiere cabeceras especiales.
         const response = await fetch(url, {
             timeout: 20000, // Aumentamos el timeout porque el proxy añade latencia.
-            headers: {
-                'x-cors-api-key': 'temp_public_key' // Clave temporal requerida por cors.sh
-            }
         });
 
         // Si la respuesta no es exitosa, lanza un error.
