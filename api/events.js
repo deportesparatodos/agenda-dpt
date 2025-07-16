@@ -9,20 +9,17 @@ const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
  */
 async function fetchPpvsSuEvents() {
     // --- INICIO DE LA MODIFICACIÓN PARA EVITAR BLOQUEO DE CLOUDFLARE ---
-    // El sitio ppvs.su usa una protección de Cloudflare que bloquea las solicitudes directas del servidor.
-    // Para solucionarlo, enrutamos la petición a través de un proxy que puede manejar los desafíos de JavaScript de Cloudflare.
-    // NOTA: Se utiliza un proxy público para la demostración. Para un entorno de producción,
-    // se recomienda un servicio de proxy de scraping más robusto y fiable (ej. ScrapingBee, ScraperAPI).
-    const PROXY_URL = 'https://corsproxy.io/?';
+    // El proxy anterior (corsproxy.io) parece estar fallando. Se cambia a un proxy alternativo
+    // que es generalmente más estable para este tipo de tareas.
+    const PROXY_URL = 'https://api.allorigins.win/raw?url=';
     const targetUrl = 'https://ppvs.su/api/streams';
     const url = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
     
-    console.log(`Obteniendo eventos desde ${targetUrl} a través del proxy...`);
+    console.log(`Obteniendo eventos desde ${targetUrl} a través de un nuevo proxy...`);
     // --- FIN DE LA MODIFICACIÓN ---
 
     try {
-        // Se realiza la petición a través del proxy. Ya no son necesarias las cabeceras personalizadas
-        // porque el proxy se encargará de hacer la solicitud al sitio de destino como si fuera un navegador.
+        // Se realiza la petición a través del proxy.
         const response = await fetch(url, {
             // Aumentamos el timeout porque el proxy añade latencia.
             timeout: 20000 
