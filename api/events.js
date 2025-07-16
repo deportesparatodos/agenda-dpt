@@ -8,21 +8,22 @@ const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
  * @returns {Promise<Array>} Una promesa que resuelve a un array de objetos de evento.
  */
 async function fetchPpvsSuEvents() {
-    // --- INICIO DE LA MODIFICACIÓN PARA EVITAR BLOQUEO DE CLOUDFLARE ---
-    // El proxy anterior (corsproxy.io) parece estar fallando. Se cambia a un proxy alternativo
-    // que es generalmente más estable para este tipo de tareas.
-    const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Se cambia a un proxy más robusto (cors.sh) que requiere una clave de API temporal
+    // para evitar los bloqueos que mostraban el mensaje "SEIZED".
+    const PROXY_URL = 'https://cors.sh/';
     const targetUrl = 'https://ppvs.su/api/streams';
-    const url = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
+    const url = `${PROXY_URL}${targetUrl}`;
     
-    console.log(`Obteniendo eventos desde ${targetUrl} a través de un nuevo proxy...`);
-    // --- FIN DE LA MODIFICACIÓN ---
-
+    console.log(`Obteniendo eventos desde ${targetUrl} a través del proxy cors.sh...`);
+    
     try {
-        // Se realiza la petición a través del proxy.
+        // Se realiza la petición a través del nuevo proxy, añadiendo la cabecera de la API key temporal.
         const response = await fetch(url, {
-            // Aumentamos el timeout porque el proxy añade latencia.
-            timeout: 20000 
+            timeout: 20000, // Aumentamos el timeout porque el proxy añade latencia.
+            headers: {
+                'x-cors-api-key': 'temp_public_key' // Clave temporal requerida por cors.sh
+            }
         });
 
         // Si la respuesta no es exitosa, lanza un error.
@@ -37,6 +38,8 @@ async function fetchPpvsSuEvents() {
         // Valida que la respuesta de la API sea exitosa y tenga el formato esperado.
         if (!data.success || !Array.isArray(data.streams)) {
             console.error('El formato de la respuesta de la API de ppvs.su no es el esperado o la petición no fue exitosa.');
+            // Añadimos un log para ver qué datos se recibieron en caso de fallo de formato.
+            console.log('Datos recibidos:', JSON.stringify(data, null, 2));
             return [];
         }
 
@@ -57,7 +60,7 @@ async function fetchPpvsSuEvents() {
                     let time;
                     const startDate = new Date(stream.starts_at * 1000);
 
-                    // Determina el estado y la hora del evento.
+                    // Lógica para determinar el estado del evento.
                     if (stream.always_live === 1) {
                         status = 'En vivo';
                         time = '24/7';
@@ -65,10 +68,7 @@ async function fetchPpvsSuEvents() {
                          if (nowInSeconds >= stream.starts_at && nowInSeconds <= stream.ends_at) {
                             status = 'En vivo';
                             time = 'En vivo';
-                        } else if (nowInSeconds > stream.ends_at) {
-                            // No incluimos eventos que ya han finalizado.
-                            return;
-                        } else {
+                        } else if (nowInSeconds < stream.starts_at) {
                             status = 'Próximamente';
                             // Formatea la hora de inicio para la zona horaria de Argentina.
                             time = startDate.toLocaleTimeString('es-AR', {
@@ -76,9 +76,12 @@ async function fetchPpvsSuEvents() {
                                 minute: '2-digit',
                                 timeZone: 'America/Argentina/Buenos_Aires'
                             });
+                        } else {
+                            // Si nowInSeconds > stream.ends_at, el evento ya finalizó y no se añade.
+                            return;
                         }
                     } else {
-                        // Si no hay tiempos de inicio/fin, se puede determinar el estado, así que se omite.
+                        // Si un evento no es 24/7 y no tiene timestamps, no se puede procesar.
                         return;
                     }
                     
