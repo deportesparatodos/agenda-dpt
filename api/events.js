@@ -4,84 +4,12 @@ import * as cheerio from 'cheerio';
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
 /**
- * PRIMER PASO: Scrapea y devuelve la lista de canales desde la web (en memoria, no guarda archivo).
+ * Función para hacer scraping de ppvs.su
  */
-async function fetchChannelsObject() {
-    const url = 'https://alangulotv.space/canal/';
-    console.log(`[SCRAPER] Iniciando actualización de canales desde: ${url}`);
+async function fetchPpvsSuEvents() {
     try {
-        const response = await fetch(url, { 
-            timeout: 15000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-        });
-        if (!response.ok) {
-            throw new Error(`Error al acceder a la página de canales. Estado: ${response.status}`);
-        }
-        const html = await response.text();
-        const regex = /const\s+channels\s*=\s*(\{[\s\S]*?\});/;
-        const match = html.match(regex);
-        if (match && match[1]) {
-            let channelsObjectString = match[1];
-            let parsedObject;
-            try {
-                // eslint-disable-next-line no-eval
-                parsedObject = eval('(' + channelsObjectString + ')');
-            } catch (e) {
-                console.error('[SCRAPER] Error al evaluar el objeto channels:', e);
-                return { canales: {} };
-            }
-            console.log(`[SCRAPER] ¡Éxito! Canales obtenidos en memoria.`);
-            return { canales: parsedObject };
-        } else {
-            console.error("[SCRAPER] No se pudo encontrar el objeto 'const channels' en el HTML.");
-            return { canales: {} };
-        }
-    } catch (error) {
-        console.error("[SCRAPER] Falló la actualización de canales.", error.message);
-        return { canales: {} };
-    }
-}
-
-/**
- * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
- */
-async function getDynamicAlanGuloConfig() {
-    const mainUrl = 'https://alangulotv.live';
-    try {
-        const response = await fetch(mainUrl, {
-            redirect: 'follow',
-            timeout: 15000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-        });
-        const finalUrl = new URL(response.url);
-        const baseDomain = finalUrl.hostname;
-        const linkDomain = `p.${baseDomain}`;
-        const agendaUrl = `https://${baseDomain}/agenda-2/`;
-        const baseOrigin = `https://${baseDomain}`;
-
-        console.log(`Dominio de AlanGuloTV detectado: ${baseDomain}`);
-        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
-    } catch (error) {
-        console.error('No se pudo obtener el dominio dinámico de AlanGuloTV. Usando valores por defecto.', error);
-        const baseDomain = 'alangulotv.space';
-        const linkDomain = `p.${baseDomain}`;
-        const agendaUrl = `https://${baseDomain}/agenda-2/`;
-        const baseOrigin = `https://${baseDomain}`;
-        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
-    }
-}
-
-/**
- * Función para hacer scraping de streamtpglobal.com
- */
-async function fetchStreamTpGlobalEvents() {
-    try {
-        console.log('Fetching StreamTpGlobal eventos JSON...');
-        const response = await fetch('https://streamtpglobal.com/eventos.json', {
+        console.log('Fetching ppvs.su eventos JSON...');
+        const response = await fetch('https://ppvs.su/api/streams', {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
@@ -90,132 +18,52 @@ async function fetchStreamTpGlobalEvents() {
         
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         
-        const events = await response.json();
-        console.log(`StreamTpGlobal: ${events.length} eventos obtenidos.`);
-        
-        return events.map(event => ({
-            ...event,
-            source: 'streamtpglobal',
-            category: 'Otros'
-        }));
-    } catch (error) {
-        console.error('Error al obtener eventos de StreamTpGlobal:', error);
-        return [];
-    }
-}
-
-/**
- * Función para hacer scraping de alangulotv usando Cheerio
- */
-async function fetchAlanGuloTVEvents(config) {
-    const agendaUrl = 'https://alangulotv.me/agenda-2/';
-    const linkDomain = 'p.alangulotv.space';
-    try {
-        console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
-        const response = await fetch(agendaUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            timeout: 15000
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        const html = await response.text();
-        const $ = cheerio.load(html);
+        const data = await response.json();
         const events = [];
-        const eventPromises = [];
         
-        $('.match-container').each((index, element) => {
-            try {
-                const $container = $(element);
-                let imageUrl = $container.find('img.event-logo').attr('src') || '';
-                if (!imageUrl) {
-                    imageUrl = $container.find('img.team-logo').first().attr('src') || '';
-                }
-                if (imageUrl && imageUrl.startsWith('/')) {
-                    imageUrl = `https://${linkDomain}${imageUrl}`;
-                }
-                const time = $container.find('.time').text().trim() || '-';
-                const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
-                const title = teamNames.length > 1 ? `${teamNames[0]} vs ${teamNames[1]}` : teamNames[0] || 'Evento sin título';
-                
-                if (title.toUpperCase().includes('MLB')) {
-                    imageUrl = `https://${linkDomain}/mlb`;
-                }
-                
-                const $linksContainer = $container.next('.links-container');
-                if ($linksContainer.length > 0) {
-                    $linksContainer.find('.link-button, a').each((i, linkEl) => {
-                        const $link = $(linkEl);
-                        const href = $link.attr('href');
-                        const buttonName = $link.text().trim() || 'CANAL';
+        if (data.success && data.streams) {
+            data.streams.forEach(category => {
+                if (category.streams) {
+                    category.streams.forEach(stream => {
+                        const eventDate = new Date(stream.starts_at * 1000);
+                        const endDate = new Date(stream.ends_at * 1000);
+                        const now = new Date();
                         
-                        if (href) {
-                            let eventPageUrl = href.startsWith('http') ? href : `https://alangulotv.me${href}`;
-                            const pathParts = href.split('/').filter(part => part.length > 0);
-                            const linkKey = pathParts[pathParts.length - 1];
+                        // Verificar si el evento está en vivo o próximo
+                        const isLive = now >= eventDate && now <= endDate;
+                        const isUpcoming = eventDate > now;
+                        
+                        if (isLive || isUpcoming) {
+                            const time = isLive ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { 
+                                hour: '2-digit', 
+                                minute: '2-digit', 
+                                timeZone: 'America/Argentina/Buenos_Aires', 
+                                hour12: false 
+                            });
                             
-                            const p = (async () => {
-                                try {
-                                    const subRes = await fetch(eventPageUrl, {
-                                        headers: {
-                                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                                        },
-                                        timeout: 15000
-                                    });
-                                    if (!subRes.ok) return;
-                                    
-                                    const subHtml = await subRes.text();
-                                    const channelsMatch = subHtml.match(/const\s+channels\s*=\s*(\{[\s\S]*?\});/);
-                                    
-                                    if (channelsMatch && channelsMatch[1]) {
-                                        let channelsObj;
-                                        try {
-                                            channelsObj = eval('(' + channelsMatch[1] + ')');
-                                        } catch (e) {
-                                            return;
-                                        }
-                                        
-                                        if (channelsObj[linkKey]) {
-                                            const channelData = channelsObj[linkKey];
-                                            const firstAvailableKey = Object.keys(channelData)[0];
-                                            if (firstAvailableKey) {
-                                                const finalLink = channelData[firstAvailableKey];
-                                                if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
-                                                    events.push({
-                                                        time,
-                                                        title,
-                                                        link: finalLink,
-                                                        button: buttonName,
-                                                        category: 'Otros',
-                                                        language: 'Español',
-                                                        date: new Date().toISOString().split('T')[0],
-                                                        source: 'alangulotv',
-                                                        image: imageUrl || DEFAULT_IMAGE
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch (e) {
-                                    // Ignorar errores
-                                }
-                            })();
-                            eventPromises.push(p);
+                            events.push({
+                                time,
+                                title: stream.name,
+                                link: stream.iframe,
+                                button: stream.tag || 'CANAL',
+                                category: stream.category_name || 'Otros',
+                                language: 'Inglés',
+                                date: eventDate.toISOString().split('T')[0],
+                                source: 'ppvs.su',
+                                image: stream.poster || DEFAULT_IMAGE,
+                                status: isLive ? 'En vivo' : 'Próximo',
+                                viewers: stream.viewers || '0'
+                            });
                         }
                     });
                 }
-            } catch (error) {
-                console.error('Error procesando evento AlanGuloTV:', error);
-            }
-        });
+            });
+        }
         
-        await Promise.all(eventPromises);
-        console.log(`AlanGuloTV: ${events.length} eventos obtenidos`);
+        console.log(`ppvs.su: ${events.length} eventos obtenidos.`);
         return events;
     } catch (error) {
-        console.error('Error al obtener eventos de AlanGuloTV:', error);
+        console.error('Error al obtener eventos de ppvs.su:', error);
         return [];
     }
 }
@@ -334,133 +182,6 @@ async function fetchWeAreCheckingMotorsportsEvents() {
     }
 }
 
-/**
- * Obtiene el mapa de categorías de deportes desde streamed.su
- */
-async function fetchStreamedSuSports() {
-    try {
-        console.log('Fetching Streamed.su sports categories...');
-        const response = await fetch('https://streamed.su/api/sports', {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            timeout: 10000
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Streamed.su API error for sports: ${response.status}`);
-        }
-        
-        const sports = await response.json();
-        const sportsMap = new Map();
-        sports.forEach(sport => sportsMap.set(sport.id, sport.name));
-        console.log('Streamed.su sports categories loaded.');
-        return sportsMap;
-    } catch (error) {
-        console.error('Error fetching Streamed.su sports categories:', error.message);
-        return new Map();
-    }
-}
-
-/**
- * Obtiene eventos en vivo desde la API de streamed.su
- */
-async function fetchStreamedSuEvents(sportsMap) {
-    try {
-        // 1. Obtener IDs de los partidos EN VIVO
-        console.log('Fetching Streamed.su live match IDs...');
-        const liveMatchesResponse = await fetch('https://streamed.su/api/matches/live', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-            timeout: 15000
-        });
-        
-        if (!liveMatchesResponse.ok) throw new Error('Failed to fetch live matches');
-        
-        const liveMatches = await liveMatchesResponse.json();
-        const liveMatchIds = new Set(liveMatches.map(m => m.id));
-        console.log(`${liveMatchIds.size} live match IDs loaded.`);
-
-        // 2. Obtener TODOS los partidos
-        console.log('Fetching ALL Streamed.su matches...');
-        const allMatchesResponse = await fetch('https://streamed.su/api/matches/all', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-            timeout: 20000
-        });
-        
-        if (!allMatchesResponse.ok) throw new Error('Failed to fetch all matches');
-        
-        const allMatches = await allMatchesResponse.json();
-        console.log(`Streamed.su: ${allMatches.length} total matches found.`);
-
-        // 3. Procesar todos los partidos para crear los eventos
-        const eventPromises = allMatches.map(async (match) => {
-            try {
-                if (!match.sources || match.sources.length === 0) return null;
-
-                const streamSourcesPromises = match.sources.map(source =>
-                    fetch(`https://streamed.su/api/stream/${source.source}/${source.id}`, {
-                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-                        timeout: 10000
-                    })
-                    .then(res => res.ok ? res.json() : [])
-                    .catch(() => [])
-                );
-
-                const streamSourcesArrays = await Promise.all(streamSourcesPromises);
-                const allStreams = streamSourcesArrays.flat().filter(s => s && s.embedUrl);
-
-                if (allStreams.length === 0) return null;
-
-                const eventDate = new Date(match.date);
-                
-                const isLive = liveMatchIds.has(match.id);
-                const status = isLive ? 'En vivo' : 'Desconocido';
-                const time = isLive ? 'En vivo' : eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false });
-
-                // Lógica de imágenes con la prioridad correcta
-                let imageUrl = DEFAULT_IMAGE;
-                if (match.teams?.home?.badge && match.teams?.away?.badge) {
-                    imageUrl = `https://streamed.su/api/images/poster/${match.teams.home.badge}/${match.teams.away.badge}.webp`;
-                } else if (match.poster) {
-                    imageUrl = `https://streamed.su/api/images/proxy/${match.poster}.webp`;
-                }
-
-                const buttons = allStreams.map(stream => {
-                    let name = (stream.language || `Stream ${stream.streamNo}`).toUpperCase().trim();
-                    if (stream.hd) {
-                        name += ' HD';
-                    }
-                    return name;
-                });
-
-                return {
-                    time: time,
-                    title: match.title,
-                    options: allStreams.map(stream => stream.embedUrl),
-                    buttons: buttons,
-                    category: sportsMap.get(match.category) || 'Otros',
-                    language: [...new Set(allStreams.map(s => s.language).filter(Boolean))].join(', ') || 'N/A',
-                    date: eventDate.toISOString().split('T')[0],
-                    source: 'streamedsu',
-                    image: imageUrl,
-                    status: status,
-                };
-            } catch (error) {
-                console.error(`Error procesando partido de Streamed.su "${match.title}":`, error);
-                return null;
-            }
-        });
-
-        const events = (await Promise.all(eventPromises)).filter(Boolean);
-        console.log(`Streamed.su: ${events.length} eventos procesados exitosamente.`);
-        return events;
-
-    } catch (error) {
-        console.error('Error al obtener eventos de Streamed.su:', error.message);
-        return [];
-    }
-}
-
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -477,29 +198,20 @@ export default async (req, res) => {
     }
 
     try {
-        const canales = await fetchChannelsObject();
         console.log('Iniciando obtención de eventos...');
-        const alanGuloConfig = await getDynamicAlanGuloConfig();
-        const sportsMap = await fetchStreamedSuSports();
         
-        const [streamTpEvents, alanGuloEvents, wacMotorsportsEvents, streamedSuEvents] = await Promise.allSettled([
-            fetchStreamTpGlobalEvents(),
-            fetchAlanGuloTVEvents(alanGuloConfig, canales),
-            fetchWeAreCheckingMotorsportsEvents(),
-            fetchStreamedSuEvents(sportsMap)
+        const [ppvsEvents, wacMotorsportsEvents] = await Promise.allSettled([
+            fetchPpvsSuEvents(),
+            fetchWeAreCheckingMotorsportsEvents()
         ]);
 
-        const streamEvents = streamTpEvents.status === 'fulfilled' ? streamTpEvents.value : [];
-        const alanEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
+        const ppvsEventsArray = ppvsEvents.status === 'fulfilled' ? ppvsEvents.value : [];
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
-        const newStreamedSuEvents = streamedSuEvents.status === 'fulfilled' ? streamedSuEvents.value : [];
         
-        if (streamTpEvents.status === 'rejected') console.error('StreamTpGlobal falló:', streamTpEvents.reason);
-        if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
+        if (ppvsEvents.status === 'rejected') console.error('ppvs.su falló:', ppvsEvents.reason);
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
-        if (streamedSuEvents.status === 'rejected') console.error('Streamed.su falló:', streamedSuEvents.reason);
 
-        const allEvents = [...streamEvents, ...alanEvents, ...wearecheckingMotorsportsEvents, ...newStreamedSuEvents];
+        const allEvents = [...ppvsEventsArray, ...wearecheckingMotorsportsEvents];
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
@@ -511,25 +223,19 @@ export default async (req, res) => {
         allEvents.forEach(event => {
             if (!event || !event.title) return;
 
-            if (event.source !== 'streamedsu') {
-                event.image = event.image || DEFAULT_IMAGE;
-            }
+            event.image = event.image || DEFAULT_IMAGE;
 
             const key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
             if (!eventMap.has(key)) {
                 let buttonArr = [];
                 let optionsArr = [];
                 
-                if (event.source === 'streamtpglobal' && event.link) {
-                    const match = event.link.match(/[?&]stream=([^&#]+)/i);
-                    buttonArr = [match ? match[1].toUpperCase() : 'CANAL'];
+                if (event.source === 'ppvs.su' && event.link) {
+                    buttonArr = [event.button || 'CANAL'];
                     optionsArr = [event.link];
                 } else if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
-                } else if (event.source === 'streamedsu' && Array.isArray(event.options)) {
-                    buttonArr = event.buttons;
-                    optionsArr = event.options;
                 } else if (event.button) {
                     buttonArr = [event.button];
                     optionsArr = [event.link];
@@ -547,7 +253,8 @@ export default async (req, res) => {
                     date: event.date || new Date().toISOString().split('T')[0],
                     source: event.source || 'unknown',
                     image: event.image || DEFAULT_IMAGE,
-                    status: event.status || 'Desconocido'
+                    status: event.status || 'Desconocido',
+                    viewers: event.viewers || '0'
                 });
             } else {
                 const existing = eventMap.get(key);
