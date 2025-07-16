@@ -11,10 +11,20 @@ async function fetchPpvsSuEvents() {
     const url = 'https://ppvs.su/api/streams';
     console.log(`Obteniendo eventos desde ${url}...`);
     try {
-        // Realiza la petición a la API. Se incluye un User-Agent para evitar errores de acceso (403 Forbidden).
+        // Realiza la petición a la API. Se incluyen cabeceras para simular un navegador real
+        // y así intentar evitar el bloqueo de Cloudflare que causa el error 403 Forbidden.
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+                'Referer': 'https://ppvs.su/',
+                'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"Windows"',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             },
             timeout: 15000 // Timeout de 15 segundos
         });
@@ -22,7 +32,9 @@ async function fetchPpvsSuEvents() {
         // Si la respuesta no es exitosa, lanza un error.
         if (!response.ok) {
             const errorBody = await response.text();
-            throw new Error(`Error HTTP ${response.status}: ${response.statusText}. Respuesta: ${errorBody}`);
+            // Si el cuerpo del error es HTML (probablemente de Cloudflare), no lo mostramos completo para no ensuciar los logs.
+            const errorDetails = errorBody.startsWith('<') ? 'Respuesta HTML de Cloudflare' : errorBody;
+            throw new Error(`Error HTTP ${response.status}: ${response.statusText}. Respuesta: ${errorDetails}`);
         }
 
         const data = await response.json();
@@ -71,7 +83,7 @@ async function fetchPpvsSuEvents() {
                             });
                         }
                     } else {
-                        // Si no hay tiempos de inicio/fin, no se puede determinar el estado, así que se omite.
+                        // Si no hay tiempos de inicio/fin, se puede determinar el estado, así que se omite.
                         return;
                     }
                     
