@@ -84,9 +84,9 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                     let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                     let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
                      time = spanText;
-                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
+                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                 }
                 const eventObj = {
                     time,
@@ -116,36 +116,157 @@ async function fetchWeAreCheckingMotorsportsEvents() {
 }
 
 /**
- * Obtiene eventos desde la API de ppvs.su usando Puppeteer para evitar el bloqueo de Cloudflare.
+ * Función para generar delay aleatorio entre acciones
+ */
+function randomDelay(min = 1000, max = 3000) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
+ * Obtiene eventos desde la API de ppvs.su usando Puppeteer con mejor evasión
  */
 async function fetchPpvSuEvents() {
     let browser = null;
     try {
-        console.log('[PPVS.su] Iniciando Puppeteer para evitar Cloudflare...');
+        console.log('[PPVS.su] Iniciando Puppeteer con configuración avanzada...');
         
-        browser = await puppeteer.launch({
-            args: chromium.args,
-            defaultViewport: chromium.defaultViewport,
+        // Configuración más robusta para evadir detección
+        const launchOptions = {
+            args: [
+                ...chromium.args,
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor',
+                '--disable-background-networking',
+                '--disable-background-timer-throttling',
+                '--disable-renderer-backgrounding',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-ipc-flooding-protection',
+                '--disable-client-side-phishing-detection',
+                '--disable-component-extensions-with-background-pages',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-images',
+                '--disable-javascript',
+                '--disable-default-apps',
+                '--disable-sync',
+                '--disable-translate',
+                '--hide-scrollbars',
+                '--mute-audio',
+                '--no-first-run',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-features=TranslateUI',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-field-trial-config',
+                '--disable-back-forward-cache',
+                '--disable-hang-monitor',
+                '--disable-prompt-on-repost',
+                '--disable-domain-reliability',
+                '--disable-component-update',
+                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            ],
+            defaultViewport: {
+                width: 1920,
+                height: 1080,
+                deviceScaleFactor: 1,
+                hasTouch: false,
+                isLandscape: true,
+                isMobile: false,
+            },
             executablePath: await chromium.executablePath(),
             headless: chromium.headless,
             ignoreHTTPSErrors: true,
+            ignoreDefaultArgs: ['--enable-automation'],
+        };
+
+        browser = await puppeteer.launch(launchOptions);
+        const page = await browser.newPage();
+
+        // Configurar headers y propiedades adicionales
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        await page.setExtraHTTPHeaders({
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
         });
 
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
+        // Ocultar propiedades de webdriver
+        await page.evaluateOnNewDocument(() => {
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined,
+            });
+            
+            // Eliminar propiedades de automatización
+            delete navigator.__proto__.webdriver;
+            
+            // Modificar plugins
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5],
+            });
+            
+            // Modificar languages
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en'],
+            });
+            
+            // Modificar permissions
+            const originalQuery = window.navigator.permissions.query;
+            return window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Cypress.deny }) :
+                    originalQuery(parameters)
+            );
+        });
+
+        // Navegar con delays aleatorios
+        console.log('[PPVS.su] Navegando a la página principal primero...');
+        await page.goto('https://ppvs.su', { 
+            waitUntil: 'networkidle2', 
+            timeout: 30000 
+        });
+
+        // Delay aleatorio antes de ir a la API
+        await page.waitForTimeout(randomDelay(2000, 4000));
 
         console.log('[PPVS.su] Navegando a la API...');
-        const response = await page.goto('https://ppvs.su/api/streams', { waitUntil: 'networkidle0', timeout: 25000 });
+        const response = await page.goto('https://ppvs.su/api/streams', { 
+            waitUntil: 'networkidle2', 
+            timeout: 30000 
+        });
         
         if (!response.ok()) {
              throw new Error(`PPVS.su API error: ${response.status()} ${response.statusText()}`);
         }
 
+        // Esperar un poco más antes de extraer los datos
+        await page.waitForTimeout(randomDelay(1000, 2000));
+
         const jsonData = await page.evaluate(() => {
-            return JSON.parse(document.querySelector('body').innerText);
+            const bodyText = document.querySelector('body').innerText;
+            try {
+                return JSON.parse(bodyText);
+            } catch (e) {
+                console.error('Error parsing JSON:', e);
+                return null;
+            }
         });
         
-        console.log('[PPVS.su] Datos obtenidos.');
+        if (!jsonData) {
+            throw new Error('No se pudo parsear el JSON de la API');
+        }
+
+        console.log('[PPVS.su] Datos obtenidos exitosamente.');
 
         const categories = jsonData.streams;
 
@@ -197,6 +318,87 @@ async function fetchPpvSuEvents() {
     }
 }
 
+/**
+ * Función alternativa usando fetch directo con rotación de User-Agents
+ */
+async function fetchPpvSuEventsFallback() {
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0'
+    ];
+
+    try {
+        console.log('[PPVS.su] Intentando fetch directo como fallback...');
+        const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
+        
+        const response = await fetch('https://ppvs.su/api/streams', {
+            headers: {
+                'User-Agent': randomUA,
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            },
+            timeout: 15000
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const jsonData = await response.json();
+        
+        // Procesar los datos igual que en la función principal
+        const categories = jsonData.streams;
+        if (!Array.isArray(categories)) {
+            return [];
+        }
+
+        const allPpvEvents = [];
+        const now = Math.floor(Date.now() / 1000);
+
+        categories.forEach(category => {
+            if (Array.isArray(category.streams)) {
+                category.streams.forEach(stream => {
+                    if (stream.iframe) {
+                        const eventDate = new Date(stream.starts_at * 1000);
+                        let status = 'Desconocido';
+                        if (stream.always_live === 1 || (now >= stream.starts_at && now <= stream.ends_at)) {
+                            status = 'En vivo';
+                        }
+                        
+                        allPpvEvents.push({
+                            time: eventDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires', hour12: false }),
+                            title: stream.name,
+                            options: [stream.iframe],
+                            buttons: [stream.tag || 'Ver'],
+                            category: stream.category_name,
+                            language: 'Inglés',
+                            date: eventDate.toISOString().split('T')[0],
+                            source: 'ppvsu',
+                            image: stream.poster,
+                            status: status,
+                        });
+                    }
+                });
+            }
+        });
+
+        console.log(`PPVS.su Fallback: ${allPpvEvents.length} eventos procesados.`);
+        return allPpvEvents;
+    } catch (error) {
+        console.error('Error en fallback de PPVS.su:', error.message);
+        return [];
+    }
+}
 
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
@@ -216,9 +418,15 @@ export default async (req, res) => {
     try {
         console.log('Iniciando obtención de eventos...');
         
+        // Intentar primero con Puppeteer, si falla usar fallback
+        let ppvSuEventsPromise = fetchPpvSuEvents().catch(async (error) => {
+            console.log('Puppeteer falló, intentando fallback:', error.message);
+            return await fetchPpvSuEventsFallback();
+        });
+
         const [wacMotorsportsEvents, ppvSuEvents] = await Promise.allSettled([
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchPpvSuEvents()
+            ppvSuEventsPromise
         ]);
 
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
