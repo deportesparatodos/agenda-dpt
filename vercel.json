@@ -2,13 +2,7 @@
   "functions": {
     "api/events.js": {
       "maxDuration": 25,
-      "memory": 1024,
-      "includeFiles": "node_modules/@sparticuz/chromium/**"
-    }
-  },
-  "build": {
-    "env": {
-      "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
+      "memory": 1024
     }
   }
 }
