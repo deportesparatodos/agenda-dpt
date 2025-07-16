@@ -8,32 +8,30 @@ const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
  * @returns {Promise<Array>} Una promesa que resuelve a un array de objetos de evento.
  */
 async function fetchPpvsSuEvents() {
-    const url = 'https://ppvs.su/api/streams';
-    console.log(`Obteniendo eventos desde ${url}...`);
+    // --- INICIO DE LA MODIFICACIÓN PARA EVITAR BLOQUEO DE CLOUDFLARE ---
+    // El sitio ppvs.su usa una protección de Cloudflare que bloquea las solicitudes directas del servidor.
+    // Para solucionarlo, enrutamos la petición a través de un proxy que puede manejar los desafíos de JavaScript de Cloudflare.
+    // NOTA: Se utiliza un proxy público para la demostración. Para un entorno de producción,
+    // se recomienda un servicio de proxy de scraping más robusto y fiable (ej. ScrapingBee, ScraperAPI).
+    const PROXY_URL = 'https://corsproxy.io/?';
+    const targetUrl = 'https://ppvs.su/api/streams';
+    const url = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
+    
+    console.log(`Obteniendo eventos desde ${targetUrl} a través del proxy...`);
+    // --- FIN DE LA MODIFICACIÓN ---
+
     try {
-        // Realiza la petición a la API. Se incluyen cabeceras para simular un navegador real
-        // y así intentar evitar el bloqueo de Cloudflare que causa el error 403 Forbidden.
+        // Se realiza la petición a través del proxy. Ya no son necesarias las cabeceras personalizadas
+        // porque el proxy se encargará de hacer la solicitud al sitio de destino como si fuera un navegador.
         const response = await fetch(url, {
-            headers: {
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-                'Referer': 'https://ppvs.su/',
-                'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-                'Sec-Ch-Ua-Mobile': '?0',
-                'Sec-Ch-Ua-Platform': '"Windows"',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            },
-            timeout: 15000 // Timeout de 15 segundos
+            // Aumentamos el timeout porque el proxy añade latencia.
+            timeout: 20000 
         });
 
         // Si la respuesta no es exitosa, lanza un error.
         if (!response.ok) {
             const errorBody = await response.text();
-            // Si el cuerpo del error es HTML (probablemente de Cloudflare), no lo mostramos completo para no ensuciar los logs.
-            const errorDetails = errorBody.startsWith('<') ? 'Respuesta HTML de Cloudflare' : errorBody;
+            const errorDetails = errorBody.startsWith('<') ? 'Respuesta HTML (posiblemente del proxy o Cloudflare)' : errorBody;
             throw new Error(`Error HTTP ${response.status}: ${response.statusText}. Respuesta: ${errorDetails}`);
         }
 
