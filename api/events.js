@@ -6,11 +6,9 @@ import path from 'path';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import UserDataDir from 'puppeteer-extra-plugin-user-data-dir';
 
-// Aplicar los plugins de forma explícita para configurar el de user-data-dir
+// Aplicar el plugin de stealth a puppeteer
 puppeteer.use(StealthPlugin());
-puppeteer.use(UserDataDir({ deleteOnExit: false })); // Desactivar el borrado automático para evitar errores en Vercel
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
