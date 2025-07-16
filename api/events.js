@@ -4,109 +4,142 @@ import fetch from 'node-fetch';
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
 /**
- * Obtiene y procesa los eventos desde la API de ppvs.su.
+ * Obtiene y procesa los eventos desde la API de ppvs.su,
+ * intentando a través de una lista de proxies hasta que uno funcione.
  * @returns {Promise<Array>} Una promesa que resuelve a un array de objetos de evento.
  */
 async function fetchPpvsSuEvents() {
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // El proxy anterior (cors.sh) está devolviendo un error 404. Cambiamos a otro
-    // proxy público (thingproxy.freeboard.io) para intentar solucionar el problema.
-    const PROXY_URL = 'https://thingproxy.freeboard.io/fetch/';
     const targetUrl = 'https://ppvs.su/api/streams';
-    const url = `${PROXY_URL}${targetUrl}`;
-    
-    console.log(`Obteniendo eventos desde ${targetUrl} a través del proxy thingproxy...`);
-    
-    try {
-        // Se realiza la petición a través del nuevo proxy. Este no requiere cabeceras especiales.
-        const response = await fetch(url, {
-            timeout: 20000, // Aumentamos el timeout porque el proxy añade latencia.
-        });
 
-        // Si la respuesta no es exitosa, lanza un error.
-        if (!response.ok) {
-            const errorBody = await response.text();
-            const errorDetails = errorBody.startsWith('<') ? 'Respuesta HTML (posiblemente del proxy o Cloudflare)' : errorBody;
-            throw new Error(`Error HTTP ${response.status}: ${response.statusText}. Respuesta: ${errorDetails}`);
+    // --- INICIO DE LA MODIFICACIÓN: SISTEMA DE PROXIES REDUNDANTES ---
+    // Lista de proxies a intentar en orden. Si uno falla, se intentará con el siguiente.
+    // Se han añadido 16 proxies más para aumentar la fiabilidad.
+    const proxies = [
+        // Proxies originales
+        'https://cors.sh/',
+        'https://thingproxy.freeboard.io/fetch/',
+        'https://api.allorigins.win/raw?url=',
+        'https://corsproxy.io/?',
+        // Nuevos proxies añadidos
+        'https://api.codetabs.com/v1/proxy?quest=',
+        'https://cors-anywhere.herokuapp.com/',
+        'https://proxy.cors.sh/',
+        'https://cors.zbe.ee/',
+        'https://yacdn.org/proxy/',
+        'https://caching-cors-anywhere.herokuapp.com/',
+        'https://cors-bypass-server.herokuapp.com/',
+        'https://pure-coast-24477.herokuapp.com/',
+        'https://calm-hollows-39328.herokuapp.com/',
+        'https://sheltered-tor-47358.herokuapp.com/',
+        'https://evening-badlands-32343.herokuapp.com/',
+        'https://fierce-retreat-76503.herokuapp.com/',
+        'https://serene-hollows-97215.herokuapp.com/',
+        'https://cors-proxy.fringe.zone/',
+        'https://cors-server.herokuapp.com/',
+        'https://pacific-caverns-96128.herokuapp.com/'
+    ];
+
+    for (const proxyUrl of proxies) {
+        let url;
+        const options = { timeout: 20000 }; // Timeout de 20 segundos por intento.
+
+        // Ajusta la URL y las opciones según los requisitos de cada proxy.
+        if (proxyUrl.includes('cors.sh')) {
+            url = `${proxyUrl}${targetUrl}`;
+            options.headers = { 'x-cors-api-key': 'temp_public_key' };
+        } else if (proxyUrl.includes('allorigins.win')) {
+            url = `${proxyUrl}${encodeURIComponent(targetUrl)}`;
+        } else if (proxyUrl.includes('codetabs.com')) {
+            url = `${proxyUrl}${targetUrl}`; // El parámetro 'quest=' ya está en la URL base.
         }
-
-        const data = await response.json();
-
-        // Valida que la respuesta de la API sea exitosa y tenga el formato esperado.
-        if (!data.success || !Array.isArray(data.streams)) {
-            console.error('El formato de la respuesta de la API de ppvs.su no es el esperado o la petición no fue exitosa.');
-            // Añadimos un log para ver qué datos se recibieron en caso de fallo de formato.
-            console.log('Datos recibidos:', JSON.stringify(data, null, 2));
-            return [];
+        else {
+            url = `${proxyUrl}${targetUrl}`;
         }
+        
+        console.log(`Intentando obtener eventos a través del proxy: ${proxyUrl}`);
+        
+        try {
+            const response = await fetch(url, options);
 
-        const allEvents = [];
-        const nowInSeconds = Date.now() / 1000; // Tiempo actual en segundos para comparar con los timestamps.
-
-        // Itera sobre cada categoría de streams.
-        data.streams.forEach(category => {
-            if (category.streams && Array.isArray(category.streams)) {
-                // Itera sobre cada stream dentro de la categoría.
-                category.streams.forEach(stream => {
-                    // Omite el evento si no tiene un enlace de iframe.
-                    if (!stream.iframe) {
-                        return;
-                    }
-
-                    let status;
-                    let time;
-                    const startDate = new Date(stream.starts_at * 1000);
-
-                    // Lógica para determinar el estado del evento.
-                    if (stream.always_live === 1) {
-                        status = 'En vivo';
-                        time = '24/7';
-                    } else if (stream.starts_at && stream.ends_at) {
-                         if (nowInSeconds >= stream.starts_at && nowInSeconds <= stream.ends_at) {
-                            status = 'En vivo';
-                            time = 'En vivo';
-                        } else if (nowInSeconds < stream.starts_at) {
-                            status = 'Próximamente';
-                            // Formatea la hora de inicio para la zona horaria de Argentina.
-                            time = startDate.toLocaleTimeString('es-AR', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                timeZone: 'America/Argentina/Buenos_Aires'
-                            });
-                        } else {
-                            // Si nowInSeconds > stream.ends_at, el evento ya finalizó y no se añade.
-                            return;
-                        }
-                    } else {
-                        // Si un evento no es 24/7 y no tiene timestamps, no se puede procesar.
-                        return;
-                    }
-                    
-                    // Construye el objeto del evento con el formato final.
-                    const event = {
-                        title: stream.name || 'Evento sin título',
-                        image: stream.poster || DEFAULT_IMAGE,
-                        category: stream.category_name || 'Otros',
-                        options: [stream.iframe], // El enlace del iframe va en un array.
-                        buttons: [stream.tag || 'VER'], // La etiqueta del stream (ej. "FOX") va como botón.
-                        time: time,
-                        status: status,
-                        date: startDate.toISOString().split('T')[0],
-                        language: 'N/A', // El idioma no es proporcionado por la API.
-                        source: 'ppvsu'
-                    };
-                    allEvents.push(event);
-                });
+            // Si la respuesta no es exitosa, lanza un error para pasar al siguiente proxy.
+            if (!response.ok) {
+                throw new Error(`Proxy falló con estado ${response.status}`);
             }
-        });
 
-        console.log(`ppvs.su: ${allEvents.length} eventos procesados exitosamente.`);
-        return allEvents;
+            const data = await response.json();
 
-    } catch (error) {
-        console.error('Error al obtener eventos de ppvs.su:', error);
-        return []; // Devuelve un array vacío en caso de error.
+            // Valida que la respuesta de la API sea la correcta y no un error del proxy.
+            if (!data.success || !Array.isArray(data.streams)) {
+                throw new Error('El proxy devolvió datos inesperados o incorrectos.');
+            }
+
+            // --- ¡ÉXITO! ---
+            // Si llegamos aquí, el proxy funcionó y tenemos los datos correctos.
+            console.log(`¡Éxito con el proxy: ${proxyUrl}! Procesando eventos...`);
+            
+            const allEvents = [];
+            const nowInSeconds = Date.now() / 1000;
+
+            data.streams.forEach(category => {
+                if (category.streams && Array.isArray(category.streams)) {
+                    category.streams.forEach(stream => {
+                        if (!stream.iframe) return;
+
+                        let status;
+                        let time;
+                        const startDate = new Date(stream.starts_at * 1000);
+
+                        if (stream.always_live === 1) {
+                            status = 'En vivo';
+                            time = '24/7';
+                        } else if (stream.starts_at && stream.ends_at) {
+                            if (nowInSeconds >= stream.starts_at && nowInSeconds <= stream.ends_at) {
+                                status = 'En vivo';
+                                time = 'En vivo';
+                            } else if (nowInSeconds < stream.starts_at) {
+                                status = 'Próximamente';
+                                time = startDate.toLocaleTimeString('es-AR', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    timeZone: 'America/Argentina/Buenos_Aires'
+                                });
+                            } else {
+                                return; // Evento finalizado
+                            }
+                        } else {
+                            return; // Evento sin datos de tiempo
+                        }
+                        
+                        const event = {
+                            title: stream.name || 'Evento sin título',
+                            image: stream.poster || DEFAULT_IMAGE,
+                            category: stream.category_name || 'Otros',
+                            options: [stream.iframe],
+                            buttons: [stream.tag || 'VER'],
+                            time: time,
+                            status: status,
+                            date: startDate.toISOString().split('T')[0],
+                            language: 'N/A',
+                            source: 'ppvsu'
+                        };
+                        allEvents.push(event);
+                    });
+                }
+            });
+
+            console.log(`ppvs.su: ${allEvents.length} eventos procesados exitosamente.`);
+            return allEvents; // Devuelve los eventos y termina la ejecución.
+
+        } catch (error) {
+            // Si un proxy falla, se registra el error y el bucle continúa con el siguiente.
+            console.error(`Error con el proxy ${proxyUrl}: ${error.message}`);
+        }
     }
+    // --- FIN DE LA MODIFICACIÓN ---
+
+    // Si el bucle termina, significa que todos los proxies fallaron.
+    console.error('Todos los proxies fallaron. No se pudieron obtener los eventos.');
+    return []; 
 }
 
 
