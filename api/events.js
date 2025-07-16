@@ -1,177 +1,140 @@
 import fetch from 'node-fetch';
 
+// Imagen por defecto en caso de que un evento no tenga una.
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
 /**
- * Función para obtener eventos desde ppvs.su
+ * Obtiene y procesa los eventos desde la API de ppvs.su.
+ * @returns {Promise<Array>} Una promesa que resuelve a un array de objetos de evento.
  */
 async function fetchPpvsSuEvents() {
+    const url = 'https://ppvs.su/api/streams';
+    console.log(`Obteniendo eventos desde ${url}...`);
     try {
-        console.log('Fetching PPVS.su eventos...');
-        
-        const response = await fetch('https://ppvs.su/api/streams', {
+        // Realiza la petición a la API. Se incluye un User-Agent para evitar errores de acceso (403 Forbidden).
+        const response = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
             },
-            timeout: 15000
+            timeout: 15000 // Timeout de 15 segundos
         });
-        
+
+        // Si la respuesta no es exitosa, lanza un error.
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorBody = await response.text();
+            throw new Error(`Error HTTP ${response.status}: ${response.statusText}. Respuesta: ${errorBody}`);
         }
-        
+
         const data = await response.json();
-        console.log(`PPVS.su: Respuesta recibida con ${data.streams ? data.streams.length : 0} streams`);
-        
-        if (!data.streams || !Array.isArray(data.streams)) {
-            console.warn('PPVS.su: No se encontraron streams en la respuesta');
+
+        // Valida que la respuesta de la API sea exitosa y tenga el formato esperado.
+        if (!data.success || !Array.isArray(data.streams)) {
+            console.error('El formato de la respuesta de la API de ppvs.su no es el esperado o la petición no fue exitosa.');
             return [];
         }
-        
-        const events = [];
-        
-        // Procesar cada categoría de streams
+
+        const allEvents = [];
+        const nowInSeconds = Date.now() / 1000; // Tiempo actual en segundos para comparar con los timestamps.
+
+        // Itera sobre cada categoría de streams.
         data.streams.forEach(category => {
-            if (!category.streams || !Array.isArray(category.streams)) {
-                return;
-            }
-            
-            category.streams.forEach(stream => {
-                try {
-                    // Convertir timestamps a fechas legibles
+            if (category.streams && Array.isArray(category.streams)) {
+                // Itera sobre cada stream dentro de la categoría.
+                category.streams.forEach(stream => {
+                    // Omite el evento si no tiene un enlace de iframe.
+                    if (!stream.iframe) {
+                        return;
+                    }
+
+                    let status;
+                    let time;
                     const startDate = new Date(stream.starts_at * 1000);
-                    const endDate = new Date(stream.ends_at * 1000);
-                    const now = new Date();
-                    
-                    // Determinar si está en vivo
-                    const isLive = now >= startDate && now <= endDate;
-                    const status = isLive ? 'En vivo' : 'Próximo';
-                    
-                    // Formatear hora
-                    const time = isLive ? 'En vivo' : startDate.toLocaleTimeString('es-AR', { 
-                        hour: '2-digit', 
-                        minute: '2-digit', 
-                        timeZone: 'America/Argentina/Buenos_Aires', 
-                        hour12: false 
-                    });
-                    
-                    // Construir el evento
-                    const event = {
-                        time: time,
-                        title: stream.name || 'Sin título',
-                        options: [stream.iframe || ''], // URL del iframe
-                        buttons: [stream.tag || 'CANAL'], // Etiqueta del canal
-                        category: category.category || 'Otros',
-                        language: 'Desconocido', // PPVS.su no parece incluir idioma
-                        date: startDate.toISOString().split('T')[0],
-                        source: 'ppvs.su',
-                        image: stream.poster || DEFAULT_IMAGE,
-                        status: status,
-                        viewers: stream.viewers || '0',
-                        starts_at: stream.starts_at,
-                        ends_at: stream.ends_at,
-                        always_live: stream.always_live || 0
-                    };
-                    
-                    // Solo agregar si tiene iframe válido
-                    if (stream.iframe && stream.iframe.trim() !== '') {
-                        events.push(event);
+
+                    // Determina el estado y la hora del evento.
+                    if (stream.always_live === 1) {
+                        status = 'En vivo';
+                        time = '24/7';
+                    } else if (stream.starts_at && stream.ends_at) {
+                         if (nowInSeconds >= stream.starts_at && nowInSeconds <= stream.ends_at) {
+                            status = 'En vivo';
+                            time = 'En vivo';
+                        } else if (nowInSeconds > stream.ends_at) {
+                            // No incluimos eventos que ya han finalizado.
+                            return;
+                        } else {
+                            status = 'Próximamente';
+                            // Formatea la hora de inicio para la zona horaria de Argentina.
+                            time = startDate.toLocaleTimeString('es-AR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone: 'America/Argentina/Buenos_Aires'
+                            });
+                        }
+                    } else {
+                        // Si no hay tiempos de inicio/fin, no se puede determinar el estado, así que se omite.
+                        return;
                     }
                     
-                } catch (error) {
-                    console.error(`Error procesando stream "${stream.name}":`, error);
-                }
-            });
+                    // Construye el objeto del evento con el formato final.
+                    const event = {
+                        title: stream.name || 'Evento sin título',
+                        image: stream.poster || DEFAULT_IMAGE,
+                        category: stream.category_name || 'Otros',
+                        options: [stream.iframe], // El enlace del iframe va en un array.
+                        buttons: [stream.tag || 'VER'], // La etiqueta del stream (ej. "FOX") va como botón.
+                        time: time,
+                        status: status,
+                        date: startDate.toISOString().split('T')[0],
+                        language: 'N/A', // El idioma no es proporcionado por la API.
+                        source: 'ppvsu'
+                    };
+                    allEvents.push(event);
+                });
+            }
         });
-        
-        console.log(`PPVS.su: ${events.length} eventos procesados exitosamente`);
-        return events;
-        
+
+        console.log(`ppvs.su: ${allEvents.length} eventos procesados exitosamente.`);
+        return allEvents;
+
     } catch (error) {
         console.error('Error al obtener eventos de ppvs.su:', error);
-        
-        // Si es error 403, intentar con headers más básicos
-        if (error.message.includes('403')) {
-            console.log('Reintentando con headers básicos...');
-            try {
-                const response = await fetch('https://ppvs.su/api/streams', {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (compatible; API Client)',
-                        'Accept': 'application/json'
-                    },
-                    timeout: 10000
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Reintento exitoso con headers básicos');
-                    // Procesar la respuesta aquí también si es necesario
-                    return [];
-                }
-            } catch (retryError) {
-                console.error('Reintento también falló:', retryError);
-            }
-        }
-        
-        return [];
+        return []; // Devuelve un array vacío en caso de error.
     }
 }
 
-/**
- * Función principal de la API
- */
+
+// --- FUNCIÓN PRINCIPAL EXPORTADA (HANDLER DE VERCELL) ---
 export default async (req, res) => {
-    // Headers CORS
+    // Configura las cabeceras de CORS y caché.
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    // Caché de 5 minutos en el CDN, con revalidación en segundo plano por 10 minutos.
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
 
+    // Maneja la petición pre-vuelo (preflight) OPTIONS de CORS.
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
+    // Solo permite peticiones GET.
     if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     try {
-        console.log('Iniciando obtención de eventos desde PPVS.su...');
-        
+        console.log('Iniciando obtención de eventos de ppvs.su...');
         const events = await fetchPpvsSuEvents();
-        
+
         if (events.length === 0) {
-            console.warn('No se obtuvieron eventos de PPVS.su');
-            return res.status(200).json([]);
+            console.warn('No se obtuvieron eventos de ppvs.su en esta ejecución.');
         }
-        
-        // Filtrar y ordenar eventos
-        const filteredEvents = events
-            .filter(event => event.options && event.options.length > 0 && event.options[0])
-            .sort((a, b) => {
-                // Primero eventos en vivo, luego por hora de inicio
-                if (a.status === 'En vivo' && b.status !== 'En vivo') return -1;
-                if (b.status === 'En vivo' && a.status !== 'En vivo') return 1;
-                return a.starts_at - b.starts_at;
-            });
-        
-        console.log(`Devolviendo ${filteredEvents.length} eventos válidos`);
-        return res.status(200).json(filteredEvents);
-        
+
+        console.log(`Total de eventos a devolver: ${events.length}`);
+        return res.status(200).json(events);
+
     } catch (error) {
-        console.error('Error en la función principal:', error);
-        return res.status(500).json({ 
-            error: 'Error interno del servidor',
-            details: error.message 
-        });
+        console.error('Error en la función principal (handler):', error);
+        return res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
