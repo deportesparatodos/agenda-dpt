@@ -1,15 +1,14 @@
 {
   "functions": {
     "api/events.js": {
-      "maxDuration": 30,
+      "maxDuration": 25,
       "memory": 1024,
-      "includeFiles": "node_modules/{puppeteer-extra,puppeteer-extra-plugin-*,@sparticuz/chromium,fs-extra,universalify,graceful-fs,jsonfile,rimraf,glob}/**"
+      "includeFiles": "node_modules/@sparticuz/chromium/**"
     }
   },
   "build": {
     "env": {
-      "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
-      "PUPPETEER_EXECUTABLE_PATH": "/opt/chromium"
+      "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
     }
   }
 }

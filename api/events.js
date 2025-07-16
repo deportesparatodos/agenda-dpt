@@ -123,6 +123,13 @@ function randomDelay(min = 1000, max = 3000) {
 }
 
 /**
+ * Función para crear delay compatible con todas las versiones de Puppeteer
+ */
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Obtiene eventos desde la API de ppvs.su usando Puppeteer con mejor evasión
  */
 async function fetchPpvSuEvents() {
@@ -133,7 +140,6 @@ async function fetchPpvSuEvents() {
         // Configuración más robusta para evadir detección
         const launchOptions = {
             args: [
-                ...chromium.args,
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
@@ -149,7 +155,6 @@ async function fetchPpvSuEvents() {
                 '--disable-extensions',
                 '--disable-plugins',
                 '--disable-images',
-                '--disable-javascript',
                 '--disable-default-apps',
                 '--disable-sync',
                 '--disable-translate',
@@ -158,15 +163,22 @@ async function fetchPpvSuEvents() {
                 '--no-first-run',
                 '--disable-blink-features=AutomationControlled',
                 '--disable-features=TranslateUI',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-field-trial-config',
-                '--disable-back-forward-cache',
                 '--disable-hang-monitor',
                 '--disable-prompt-on-repost',
                 '--disable-domain-reliability',
                 '--disable-component-update',
-                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                '--single-process',
+                '--disable-gpu',
+                '--disable-gpu-rasterization',
+                '--disable-gpu-sandbox',
+                '--disable-software-rasterizer',
+                '--disable-background-timer-throttling',
+                '--disable-renderer-backgrounding',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-field-trial-config',
+                '--disable-back-forward-cache',
+                '--memory-pressure-off',
+                '--max_old_space_size=4096'
             ],
             defaultViewport: {
                 width: 1920,
@@ -177,10 +189,16 @@ async function fetchPpvSuEvents() {
                 isMobile: false,
             },
             executablePath: await chromium.executablePath(),
-            headless: chromium.headless,
+            headless: true,
             ignoreHTTPSErrors: true,
             ignoreDefaultArgs: ['--enable-automation'],
+            timeout: 30000,
         };
+
+        // Usar chromium args si están disponibles
+        if (chromium.args) {
+            launchOptions.args = [...chromium.args, ...launchOptions.args];
+        }
 
         browser = await puppeteer.launch(launchOptions);
         const page = await browser.newPage();
@@ -189,14 +207,13 @@ async function fetchPpvSuEvents() {
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         
         await page.setExtraHTTPHeaders({
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
         });
@@ -219,38 +236,21 @@ async function fetchPpvSuEvents() {
             Object.defineProperty(navigator, 'languages', {
                 get: () => ['en-US', 'en'],
             });
-            
-            // Modificar permissions
-            const originalQuery = window.navigator.permissions.query;
-            return window.navigator.permissions.query = (parameters) => (
-                parameters.name === 'notifications' ?
-                    Promise.resolve({ state: Cypress.deny }) :
-                    originalQuery(parameters)
-            );
         });
 
-        // Navegar con delays aleatorios
-        console.log('[PPVS.su] Navegando a la página principal primero...');
-        await page.goto('https://ppvs.su', { 
-            waitUntil: 'networkidle2', 
-            timeout: 30000 
-        });
-
-        // Delay aleatorio antes de ir a la API
-        await page.waitForTimeout(randomDelay(2000, 4000));
-
+        // Navegar directamente a la API - más simple y rápido
         console.log('[PPVS.su] Navegando a la API...');
         const response = await page.goto('https://ppvs.su/api/streams', { 
-            waitUntil: 'networkidle2', 
-            timeout: 30000 
+            waitUntil: 'networkidle0', 
+            timeout: 25000 
         });
         
         if (!response.ok()) {
              throw new Error(`PPVS.su API error: ${response.status()} ${response.statusText()}`);
         }
 
-        // Esperar un poco más antes de extraer los datos
-        await page.waitForTimeout(randomDelay(1000, 2000));
+        // Esperar usando setTimeout nativo en lugar de page.waitForTimeout
+        await delay(randomDelay(500, 1500));
 
         const jsonData = await page.evaluate(() => {
             const bodyText = document.querySelector('body').innerText;
@@ -312,8 +312,12 @@ async function fetchPpvSuEvents() {
         return [];
     } finally {
         if (browser) {
-            await browser.close();
-            console.log('[PPVS.su] Navegador cerrado.');
+            try {
+                await browser.close();
+                console.log('[PPVS.su] Navegador cerrado.');
+            } catch (closeError) {
+                console.error('Error al cerrar navegador:', closeError.message);
+            }
         }
     }
 }
