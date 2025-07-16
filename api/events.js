@@ -7,7 +7,7 @@ import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-// Aplicar el plugin de stealth a puppeteer
+// Aplicar el plugin de stealth, que es el único que necesitamos para evitar el bloqueo
 puppeteer.use(StealthPlugin());
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
