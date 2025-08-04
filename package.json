@@ -12,9 +12,11 @@
     "start": "vercel dev"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^138.0.2",
-    "axios": "^1.10.0",
-    "cheerio": "^1.1.0",
-    "node-fetch": "^3.3.2"
+    "@sparticuz/chromium": "^123.0.1",
+    "cheerio": "^1.0.0-rc.12",
+    "node-fetch": "^3.3.2",
+    "puppeteer-core": "^22.13.1",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
 }
