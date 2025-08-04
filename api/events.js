@@ -2,79 +2,15 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
+// Usar import para todos los paquetes, que es lo correcto para tu proyecto
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+// Aplicar el plugin de stealth para evitar bloqueos
+puppeteer.use(StealthPlugin());
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
-
-/**
- * PRIMER PASO: Scrapea y devuelve la lista de canales desde la web (en memoria, no guarda archivo).
- */
-async function fetchChannelsObject() {
-    const url = 'https://alangulotv.space/canal/';
-    console.log(`[SCRAPER] Iniciando actualización de canales desde: ${url}`);
-    try {
-        const response = await fetch(url, { timeout: 15000 });
-        if (!response.ok) {
-            throw new Error(`Error al acceder a la página de canales. Estado: ${response.status}`);
-        }
-        const html = await response.text();
-        const regex = /const\s+channels\s*=\s*(\{[\s\S]*?\});/;
-        const match = html.match(regex);
-        if (match && match[1]) {
-            let channelsObjectString = match[1];
-            let parsedObject;
-            try {
-                // eslint-disable-next-line no-eval
-                parsedObject = eval('(' + channelsObjectString + ')');
-            } catch (e) {
-                console.error('[SCRAPER] Error al evaluar el objeto channels:', e);
-                return { canales: {} };
-            }
-            console.log(`[SCRAPER] ¡Éxito! Canales obtenidos en memoria.`);
-            return { canales: parsedObject };
-        } else {
-            console.error("[SCRAPER] No se pudo encontrar el objeto 'const channels' en el HTML.");
-            return { canales: {} };
-        }
-    } catch (error) {
-        console.error("[SCRAPER] Falló la actualización de canales.", error.message);
-        return { canales: {} };
-    }
-}
-
-/**
- * Detecta dinámicamente el dominio base de AlanGuloTV siguiendo redirecciones.
- */
-async function getDynamicAlanGuloConfig() {
-    const mainUrl = 'https://alangulotv.blog'; // Usamos el último dominio conocido como punto de partida
-    try {
-        console.log(`[AlanGuloTV] Buscando el dominio activo desde: ${mainUrl}`);
-        const response = await fetch(mainUrl, {
-            redirect: 'follow', // Sigue las redirecciones automáticamente
-            timeout: 15000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-        });
-        // La URL final después de todas las redirecciones
-        const finalUrl = new URL(response.url);
-        const baseDomain = finalUrl.hostname;
-        const linkDomain = `p.${baseDomain}`;
-        const agendaUrl = `https://${baseDomain}/agenda-2/`;
-        const baseOrigin = `https://${baseDomain}`;
-
-        console.log(`[AlanGuloTV] Dominio activo detectado: ${baseDomain}`);
-        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
-    } catch (error) {
-        console.error('[AlanGuloTV] No se pudo obtener el dominio dinámico. Usando valores por defecto.', error);
-        // Fallback a un dominio conocido si la detección falla
-        const baseDomain = 'alangulotv.space';
-        const linkDomain = `p.${baseDomain}`;
-        const agendaUrl = `https://${baseDomain}/agenda-2/`;
-        const baseOrigin = `https://${baseDomain}`;
-        return { baseDomain, linkDomain, agendaUrl, baseOrigin };
-    }
-}
-
 
 /**
  * Scrapea los links de cada evento de wearechecking.online
@@ -178,92 +114,76 @@ async function fetchWeAreCheckingMotorsportsEvents() {
 }
 
 /**
- * Función para hacer scraping de alangulotv usando Cheerio
+ * Obtiene eventos desde la página de AlanGuloTV usando Puppeteer.
  */
-async function fetchAlanGuloTVEvents(config, channelsData) { // Acepta los datos de los canales
-    const { agendaUrl, linkDomain, baseOrigin } = config; // Usar URL dinámica y origen base
+async function fetchAlanGuloTVEvents() {
+    let browser = null;
     try {
-        console.log(`Fetching AlanGuloTV eventos desde ${agendaUrl}...`);
-        const response = await fetch(agendaUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            timeout: 15000
+        console.log('[AlanGuloTV] Iniciando Puppeteer...');
+        browser = await puppeteer.launch({
+            args: chromium.args,
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
+            ignoreHTTPSErrors: true,
         });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        const html = await response.text();
+
+        const page = await browser.newPage();
+        const agendaUrl = 'https://alangulotv.blog/agenda-2/';
+        console.log(`[AlanGuloTV] Navegando a ${agendaUrl}...`);
+        await page.goto(agendaUrl, { waitUntil: 'networkidle0', timeout: 25000 });
+
+        // Esperar a que los contenedores de los partidos se carguen en la página
+        await page.waitForSelector('.match-container', { timeout: 15000 });
+        console.log('[AlanGuloTV] Contenedores de partidos encontrados.');
+
+        const html = await page.content();
+        await browser.close();
+        console.log('[AlanGuloTV] Navegador cerrado. Procesando HTML.');
+
         const $ = cheerio.load(html);
         const events = [];
-        const eventPromises = [];
+        
         $('.match-container').each((index, element) => {
-            try {
-                const $container = $(element);
-                let imageUrl = $container.find('img.event-logo').attr('src') || '';
-                if (!imageUrl) {
-                    imageUrl = $container.find('img.team-logo').first().attr('src') || '';
-                }
-                if (imageUrl && imageUrl.startsWith('/')) {
-                    imageUrl = `https://${linkDomain}${imageUrl}`;
-                }
-                const time = $container.find('.time').text().trim() || '-';
-                const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
-                const title = teamNames.length > 1 ? `${teamNames[0]} vs ${teamNames[1]}` : teamNames[0] || 'Evento sin título';
-                if (title.toUpperCase().includes('MLB')) {
-                    imageUrl = `https://${linkDomain}/mlb`;
-                }
-                const $linksContainer = $container.next('.links-container');
-                if ($linksContainer.length > 0) {
-                    $linksContainer.find('.link-button, a').each((i, linkEl) => {
-                        const $link = $(linkEl);
-                        const href = $link.attr('href');
-                        const buttonName = $link.text().trim() || 'CANAL';
-                        if (href) {
-                            let eventPageUrl = href.startsWith('http') ? href : `${baseOrigin}${href}`;
-                            const pathParts = href.split('/').filter(part => part.length > 0);
-                            const linkKey = pathParts[pathParts.length - 1];
-                            const p = (async () => {
-                                try {
-                                    // Usar el objeto de canales ya cargado
-                                    const channelsObj = channelsData.canales;
-                                    if (channelsObj && channelsObj[linkKey]) {
-                                        const channelData = channelsObj[linkKey];
-                                        const firstAvailableKey = Object.keys(channelData)[0];
-                                        if (firstAvailableKey) {
-                                            const finalLink = channelData[firstAvailableKey];
-                                            if (finalLink && typeof finalLink === 'string' && finalLink.trim() !== '') {
-                                                events.push({
-                                                    time,
-                                                    title,
-                                                    options: [finalLink],
-                                                    buttons: [buttonName],
-                                                    category: 'Otros',
-                                                    language: 'Español',
-                                                    date: new Date().toISOString().split('T')[0],
-                                                    source: 'alangulotv',
-                                                    image: imageUrl
-                                                });
-                                            }
-                                        }
-                                    }
-                                } catch (e) {
-                                    // Ignorar errores
-                                }
-                            })();
-                            eventPromises.push(p);
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error procesando evento AlanGuloTV:', error);
+            const $container = $(element);
+            const time = $container.find('.time').text().trim() || '-';
+            const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
+            let title = teamNames.length > 1 ? `${teamNames[0]} vs ${teamNames[1]}` : $container.text().replace(time, '').trim();
+            if (teamNames.length === 0 && title.includes('vs')) { // Caso especial sin .team-name
+                title = title.split('vs').map(t => t.trim()).join(' vs ');
+            }
+
+            const linksContainer = $container.next('.links-container');
+            if (linksContainer.length > 0) {
+                linksContainer.find('a.link-button').each((i, linkEl) => {
+                    const $link = $(linkEl);
+                    const href = $link.attr('href');
+                    const buttonName = $link.text().trim();
+                    if (href) {
+                        events.push({
+                            time,
+                            title,
+                            options: [`https://alangulotv.blog${href}`], // Construir URL completa
+                            buttons: [buttonName],
+                            category: 'Otros',
+                            language: 'Español',
+                            date: new Date().toISOString().split('T')[0],
+                            source: 'alangulotv',
+                            image: $container.find('.team-logo').first().attr('src') || $container.find('.event-logo').attr('src') || '',
+                            status: time.toLowerCase().includes('en vivo') ? 'En vivo' : 'Desconocido'
+                        });
+                    }
+                });
             }
         });
-        await Promise.all(eventPromises);
-        console.log(`AlanGuloTV: ${events.length} eventos obtenidos`);
+
+        console.log(`AlanGuloTV: ${events.length} eventos procesados exitosamente.`);
         return events;
     } catch (error) {
-        console.error('Error al obtener eventos de AlanGuloTV:', error);
+        console.error('Error al obtener eventos de AlanGuloTV:', error.message);
+        if (browser) {
+            await browser.close();
+        }
         return [];
     }
 }
@@ -287,22 +207,18 @@ export default async (req, res) => {
     try {
         console.log('Iniciando obtención de eventos...');
         
-        const alanGuloConfig = await getDynamicAlanGuloConfig();
-        const channelsData = await fetchChannelsObject(); // Cargar los canales una vez
-
         const [wacMotorsportsEvents, alanGuloEvents] = await Promise.allSettled([
             fetchWeAreCheckingMotorsportsEvents(),
-            fetchAlanGuloTVEvents(alanGuloConfig, channelsData) // Pasar los canales
+            fetchAlanGuloTVEvents()
         ]);
 
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const newAlanGuloEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
-
+        
         if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
         if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
 
         const allEvents = [...wearecheckingMotorsportsEvents, ...newAlanGuloEvents];
-        
         console.log(`Total eventos combinados: ${allEvents.length}`);
         
         if (allEvents.length === 0) {
