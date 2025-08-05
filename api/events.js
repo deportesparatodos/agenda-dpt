@@ -1,16 +1,8 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-// Importar explícitamente los plugins que causan error
-import UserPreferencesPlugin from 'puppeteer-extra-plugin-user-preferences';
-import UserDataDirPlugin from 'puppeteer-extra-plugin-user-data-dir';
-
-// Aplicar los plugins a puppeteer
-puppeteer.use(StealthPlugin());
-puppeteer.use(UserPreferencesPlugin());
-puppeteer.use(UserDataDirPlugin()); // Usar el nuevo plugin explícitamente
+// Importamos puppeteer-core en lugar de puppeteer-extra
+import puppeteer from 'puppeteer-core';
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
@@ -120,18 +112,20 @@ async function fetchWeAreCheckingMotorsportsEvents() {
 async function fetchAlanGuloTVEvents() {
     let browser = null;
     try {
-        console.log('[AlanGuloTV] Iniciando Puppeteer...');
-        const isVercel = process.env.VERCEL === '1';
+        console.log('[AlanGuloTV] Iniciando Puppeteer con puppeteer-core...');
         
         browser = await puppeteer.launch({
-            args: isVercel ? chromium.args : [],
+            args: chromium.args,
             defaultViewport: chromium.defaultViewport,
-            executablePath: isVercel ? await chromium.executablePath() : undefined,
-            headless: isVercel ? chromium.headless : false,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
             ignoreHTTPSErrors: true,
         });
 
         const page = await browser.newPage();
+        // Añadimos un User-Agent para parecer un navegador normal
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36');
+
         const agendaUrl = 'https://alangulotv.blog/agenda-2/';
         console.log(`[AlanGuloTV] Navegando a ${agendaUrl}...`);
         
