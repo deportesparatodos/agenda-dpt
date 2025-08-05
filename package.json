@@ -12,9 +12,9 @@
     "start": "vercel dev"
   },
   "dependencies": {
-    "@sparticuz/chromium": "119.0.0",
+    "@sparticuz/chromium": "109.0.0",
     "cheerio": "^1.0.0-rc.12",
     "node-fetch": "^3.3.2",
-    "puppeteer-core": "21.3.6"
+    "puppeteer-core": "19.2.2"
   }
 }
