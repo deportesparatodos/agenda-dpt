@@ -3,21 +3,86 @@ import * as cheerio from 'cheerio';
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
+// Headers más realistas para evadir detección de bots
+const getRandomUserAgent = () => {
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0'
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+};
+
+const getBrowserHeaders = () => ({
+    'User-Agent': getRandomUserAgent(),
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'DNT': '1',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Cache-Control': 'max-age=0',
+    'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"'
+});
+
+// Función para hacer fetch con reintentos y delay aleatorio
+async function fetchWithRetry(url, options = {}, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            // Delay aleatorio entre intentos
+            if (attempt > 1) {
+                const delay = Math.random() * 2000 + 1000; // 1-3 segundos
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    ...getBrowserHeaders(),
+                    ...options.headers
+                },
+                timeout: 30000
+            });
+
+            if (response.ok) {
+                return response;
+            }
+
+            if (response.status === 403 && attempt < maxRetries) {
+                console.log(`[${url}] Intento ${attempt} falló con 403, reintentando...`);
+                continue;
+            }
+
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        } catch (error) {
+            console.error(`[${url}] Intento ${attempt} falló:`, error.message);
+            
+            if (attempt === maxRetries) {
+                throw error;
+            }
+        }
+    }
+}
+
 /**
  * Scrapea los links de cada evento de wearechecking.online
  */
 async function fetchWACLinksForEvent(eventUrl) {
     try {
-        const response = await fetch(eventUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            timeout: 15000
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const response = await fetchWithRetry(eventUrl);
         const html = await response.text();
         const $ = cheerio.load(html);
         const options = [];
+        
         $('.feed-buttons-wrapper .feed-button').each((i, btn) => {
             const onclick = $(btn).attr('onclick') || '';
             const match = onclick.match(/src = '([^']+)'/);
@@ -29,7 +94,7 @@ async function fetchWACLinksForEvent(eventUrl) {
         });
         return options;
     } catch (error) {
-        console.error('Error al obtener links de evento WAC:', eventUrl, error);
+        console.error('Error al obtener links de evento WAC:', eventUrl, error.message);
         return [];
     }
 }
@@ -41,17 +106,13 @@ async function fetchWeAreCheckingMotorsportsEvents() {
     try {
         const url = 'https://wearechecking.online/streams-pages/motorsports';
         console.log('Fetching WeAreChecking Motorsports eventos desde', url);
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            timeout: 15000
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
+        const response = await fetchWithRetry(url);
         const html = await response.text();
         const $ = cheerio.load(html);
         const events = [];
         const eventPromises = [];
+        
         $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
             const $wrapper = $(el);
             const imageSrc = $wrapper.find('.stream-thumb').attr('src');
@@ -67,6 +128,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 const link = match ? `https://wearechecking.online${match[1]}` : '';
                 const $p = $feed.find('p');
                 if ($p.length === 0 || /No events/i.test($p.text())) return;
+                
                 let time = '-';
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
@@ -75,6 +137,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                      time = spanText;
                      title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                 }
+                
                 const eventObj = {
                     time,
                     title,
@@ -87,6 +150,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     image: imageUrl,
                     options: []
                 };
+                
                 const p = fetchWACLinksForEvent(link).then(options => {
                     eventObj.options = options;
                     return eventObj;
@@ -94,223 +158,192 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 eventPromises.push(p);
             });
         });
+        
         const results = await Promise.all(eventPromises);
         return results.filter(ev => ev.options && ev.options.length > 0);
     } catch (error) {
-        console.error('Error al obtener eventos de WeAreChecking Motorsports:', error);
+        console.error('Error al obtener eventos de WeAreChecking Motorsports:', error.message);
         return [];
     }
 }
 
 /**
- * Obtiene eventos desde la página de AlanGuloTV usando solo fetch (sin Puppeteer).
- * @returns {Promise<Array>} Una promesa que resuelve a un array de eventos.
+ * Obtiene eventos desde la página de AlanGuloTV con múltiples estrategias anti-bot
  */
 async function fetchAlanGuloTVEvents() {
-    try {
-        console.log('[AlanGuloTV] Iniciando scraping con fetch...');
-        
-        const agendaUrl = 'https://alangulotv.blog/agenda-2/';
-        console.log(`[AlanGuloTV] Obteniendo HTML desde ${agendaUrl}...`);
-        
-        const response = await fetch(agendaUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-            },
-            timeout: 30000
-        });
+    const urls = [
+        'https://alangulotv.blog/agenda-2/',
+        'https://alangulotv.space/agenda-2/',
+        'https://www.alangulotv.blog/agenda-2/'
+    ];
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const html = await response.text();
-        console.log(`[AlanGuloTV] HTML obtenido (${html.length} caracteres), procesando con Cheerio...`);
-
-        const $ = cheerio.load(html);
-        const events = [];
-        let currentTitle = null;
-
-        // Buscar diferentes patrones de contenido
-        console.log('[AlanGuloTV] Buscando contenedores de eventos...');
-
-        // Patrón 1: Buscar comentarios HTML y contenedores de partidos
-        $('.agenda-scroller > *').each((index, element) => {
-            const node = element;
-
-            if (node.type === 'comment') {
-                const commentText = node.data.trim();
-                if (commentText.startsWith('Partido:')) {
-                    currentTitle = commentText.replace('Partido:', '').trim();
-                    console.log(`[AlanGuloTV] Encontrado título en comentario: ${currentTitle}`);
+    for (const url of urls) {
+        try {
+            console.log(`[AlanGuloTV] Intentando con URL: ${url}`);
+            
+            // Delay inicial aleatorio
+            await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500));
+            
+            const response = await fetchWithRetry(url, {
+                headers: {
+                    'Referer': 'https://www.google.com/',
+                    'Origin': 'https://www.google.com'
                 }
-                return;
-            }
+            });
 
-            if (node.type === 'tag' && $(node).hasClass('match-container')) {
-                const $container = $(node);
-                
-                let title = currentTitle;
-                if (!title) {
-                    const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
-                    if (teamNames.length >= 2) {
-                        title = `${teamNames[0]} vs ${teamNames[1]}`;
-                    } else {
-                        title = $container.find('.event-title, .match-title, h3, h4').first().text().trim() || 'Evento';
+            const html = await response.text();
+            console.log(`[AlanGuloTV] HTML obtenido de ${url} (${html.length} caracteres)`);
+
+            const $ = cheerio.load(html);
+            const events = [];
+            let currentTitle = null;
+
+            // Estrategia 1: Buscar comentarios HTML y contenedores de partidos
+            $('.agenda-scroller > *, .match-container, .event-container, .game-container').each((index, element) => {
+                const node = element;
+
+                if (node.type === 'comment') {
+                    const commentText = node.data.trim();
+                    if (commentText.startsWith('Partido:')) {
+                        currentTitle = commentText.replace('Partido:', '').trim();
+                        console.log(`[AlanGuloTV] Encontrado título en comentario: ${currentTitle}`);
                     }
-                }
-                
-                const time = $container.find('.time, .match-time, .event-time').text().trim() || '-';
-                const image = $container.find('.team-logo, .event-logo, img').first().attr('src') || DEFAULT_IMAGE;
-                const status = time.toLowerCase().includes('en vivo') ? 'En vivo' : 'Próximamente';
-
-                const options = [];
-                const buttons = [];
-
-                let linksContainer = $container.find('.links-container');
-                if (linksContainer.length === 0) {
-                    linksContainer = $container.next('.links-container');
+                    return;
                 }
 
-                if (linksContainer.length > 0) {
+                if (node.type === 'tag') {
+                    const $container = $(node);
+                    
+                    let title = currentTitle;
+                    if (!title) {
+                        const teamNames = $container.find('.team-name, .team, .equipo').map((i, el) => $(el).text().trim()).get();
+                        if (teamNames.length >= 2) {
+                            title = `${teamNames[0]} vs ${teamNames[1]}`;
+                        } else {
+                            title = $container.find('.event-title, .match-title, .title, h3, h4, h2').first().text().trim();
+                        }
+                    }
+                    
+                    if (!title || title === 'Evento') {
+                        title = $container.text().trim().split('\n')[0] || null;
+                    }
+                    
+                    if (!title) return;
+                    
+                    const time = $container.find('.time, .match-time, .event-time, .hora').text().trim() || '-';
+                    const image = $container.find('.team-logo, .event-logo, .logo, img').first().attr('src') || DEFAULT_IMAGE;
+                    const status = time.toLowerCase().includes('en vivo') ? 'En vivo' : 'Próximamente';
+
+                    const options = [];
+                    const buttons = [];
+
+                    // Buscar enlaces en diferentes contenedores
+                    let linksContainer = $container.find('.links-container, .enlaces, .canales');
+                    if (linksContainer.length === 0) {
+                        linksContainer = $container.next('.links-container, .enlaces, .canales');
+                    }
+                    if (linksContainer.length === 0) {
+                        linksContainer = $container;
+                    }
+
                     linksContainer.find('a[href]').each((i, linkEl) => {
                         const $link = $(linkEl);
                         const href = $link.attr('href');
-                        const buttonName = $link.text().trim() || `Canal ${i + 1}`;
+                        let buttonName = $link.text().trim();
                         
-                        if (href && href !== '#' && !href.includes('javascript:')) {
-                            const fullUrl = href.startsWith('http') ? href : `https://alangulotv.space${href}`;
+                        if (!buttonName) {
+                            buttonName = $link.attr('title') || $link.attr('alt') || `Canal ${i + 1}`;
+                        }
+                        
+                        if (href && href !== '#' && !href.includes('javascript:') && !href.includes('mailto:')) {
+                            let fullUrl = href;
+                            if (!href.startsWith('http')) {
+                                if (href.startsWith('/')) {
+                                    fullUrl = `https://alangulotv.space${href}`;
+                                } else {
+                                    fullUrl = `https://alangulotv.space/${href}`;
+                                }
+                            }
                             options.push(fullUrl);
                             buttons.push(buttonName);
                         }
                     });
-                }
-                
-                if (title && title !== 'Evento') {
-                    events.push({
-                        time,
-                        title,
-                        options,
-                        buttons,
-                        category: 'Deportes',
-                        language: 'Español',
-                        date: new Date().toISOString().split('T')[0],
-                        source: 'alangulotv',
-                        image,
-                        status
-                    });
                     
-                    console.log(`[AlanGuloTV] Evento procesado: ${title} - ${options.length} enlaces`);
+                    if (title && title.length > 2 && (options.length > 0 || time !== '-')) {
+                        events.push({
+                            time,
+                            title: title.substring(0, 100), // Limitar longitud
+                            options,
+                            buttons,
+                            category: 'Deportes',
+                            language: 'Español',
+                            date: new Date().toISOString().split('T')[0],
+                            source: 'alangulotv',
+                            image: image.startsWith('http') ? image : DEFAULT_IMAGE,
+                            status
+                        });
+                        
+                        console.log(`[AlanGuloTV] Evento procesado: ${title} - ${options.length} enlaces`);
+                    }
+                    
+                    currentTitle = null;
                 }
-                
-                currentTitle = null;
-            }
-        });
+            });
 
-        // Patrón 2: Buscar directamente contenedores con clases específicas
-        if (events.length === 0) {
-            console.log('[AlanGuloTV] Probando patrón alternativo...');
-            
-            $('.match-container, .event-container, .game-container').each((index, element) => {
-                const $container = $(element);
+            // Estrategia 2: Buscar enlaces directos si no se encontraron eventos
+            if (events.length === 0) {
+                console.log('[AlanGuloTV] Buscando enlaces directos...');
                 
-                // Extraer título
-                let title = $container.find('.team-name').map((i, el) => $(el).text().trim()).get().join(' vs ');
-                if (!title) {
-                    title = $container.find('h3, h4, .title, .event-title, .match-title').first().text().trim();
-                }
-                
-                if (!title) return;
-                
-                const time = $container.find('.time, .match-time, .event-time').text().trim() || '-';
-                const image = $container.find('img').first().attr('src') || DEFAULT_IMAGE;
-                const status = time.toLowerCase().includes('en vivo') ? 'En vivo' : 'Próximamente';
-
-                const options = [];
-                const buttons = [];
-
-                $container.find('a[href]').each((i, linkEl) => {
+                const foundLinks = new Set();
+                $('a[href*="alangulotv"], a[href*="/canal"], a[href*="/ver"], a[href*="stream"]').each((i, linkEl) => {
                     const $link = $(linkEl);
                     const href = $link.attr('href');
-                    const buttonName = $link.text().trim() || `Canal ${i + 1}`;
+                    let text = $link.text().trim();
                     
-                    if (href && href !== '#' && !href.includes('javascript:')) {
-                        const fullUrl = href.startsWith('http') ? href : `https://alangulotv.space${href}`;
-                        options.push(fullUrl);
-                        buttons.push(buttonName);
+                    if (!text) {
+                        text = $link.closest('div').text().trim().split('\n')[0] || `Canal ${i + 1}`;
+                    }
+                    
+                    if (href && text && !foundLinks.has(href) && text.length > 2) {
+                        foundLinks.add(href);
+                        let fullUrl = href;
+                        if (!href.startsWith('http')) {
+                            fullUrl = href.startsWith('/') ? `https://alangulotv.space${href}` : `https://alangulotv.space/${href}`;
+                        }
+                        
+                        events.push({
+                            time: '-',
+                            title: text.substring(0, 100),
+                            options: [fullUrl],
+                            buttons: [text.substring(0, 20)],
+                            category: 'Deportes',
+                            language: 'Español',
+                            date: new Date().toISOString().split('T')[0],
+                            source: 'alangulotv',
+                            image: DEFAULT_IMAGE,
+                            status: 'Disponible'
+                        });
                     }
                 });
                 
-                events.push({
-                    time,
-                    title,
-                    options,
-                    buttons,
-                    category: 'Deportes',
-                    language: 'Español',
-                    date: new Date().toISOString().split('T')[0],
-                    source: 'alangulotv',
-                    image,
-                    status
-                });
-                
-                console.log(`[AlanGuloTV] Evento alternativo procesado: ${title} - ${options.length} enlaces`);
-            });
-        }
+                console.log(`[AlanGuloTV] Encontrados ${foundLinks.size} enlaces directos`);
+            }
 
-        // Patrón 3: Buscar enlaces directos en toda la página
-        if (events.length === 0) {
-            console.log('[AlanGuloTV] Probando extracción de enlaces directos...');
+            console.log(`[AlanGuloTV] ${events.length} eventos procesados exitosamente desde ${url}`);
             
-            const foundLinks = [];
-            $('a[href*="alangulotv.space"], a[href*="/canal"], a[href*="/ver"]').each((i, linkEl) => {
-                const $link = $(linkEl);
-                const href = $link.attr('href');
-                const text = $link.text().trim();
-                
-                if (href && text && !foundLinks.includes(href)) {
-                    foundLinks.push(href);
-                    const fullUrl = href.startsWith('http') ? href : `https://alangulotv.space${href}`;
-                    
-                    events.push({
-                        time: '-',
-                        title: text || 'Evento de AlanGuloTV',
-                        options: [fullUrl],
-                        buttons: [text || 'Ver'],
-                        category: 'Deportes',
-                        language: 'Español',
-                        date: new Date().toISOString().split('T')[0],
-                        source: 'alangulotv',
-                        image: DEFAULT_IMAGE,
-                        status: 'Disponible'
-                    });
-                }
-            });
-            
-            console.log(`[AlanGuloTV] Encontrados ${foundLinks.length} enlaces directos`);
-        }
+            if (events.length > 0) {
+                return events;
+            }
 
-        console.log(`[AlanGuloTV] ${events.length} eventos procesados exitosamente.`);
-        
-        if (events.length === 0) {
-            console.warn("[AlanGuloTV] No se extrajo ningún evento. Mostrando muestra de HTML:");
-            console.log(html.substring(0, 2000));
+        } catch (error) {
+            console.error(`[AlanGuloTV] Error con ${url}:`, error.message);
+            continue;
         }
-        
-        return events;
-        
-    } catch (error) {
-        console.error('Error detallado en fetchAlanGuloTVEvents:', error);
-        return [];
     }
-}
 
+    console.error('[AlanGuloTV] Todos los intentos fallaron');
+    return [];
+}
 
 // --- FUNCIÓN PRINCIPAL EXPORTADA ---
 export default async (req, res) => {
@@ -338,32 +371,39 @@ export default async (req, res) => {
         const wearecheckingMotorsportsEvents = wacMotorsportsEvents.status === 'fulfilled' ? wacMotorsportsEvents.value : [];
         const newAlanGuloEvents = alanGuloEvents.status === 'fulfilled' ? alanGuloEvents.value : [];
         
-        if (wacMotorsportsEvents.status === 'rejected') console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason);
-        if (alanGuloEvents.status === 'rejected') console.error('AlanGuloTV falló:', alanGuloEvents.reason);
+        if (wacMotorsportsEvents.status === 'rejected') {
+            console.error('WeAreChecking Motorsports falló:', wacMotorsportsEvents.reason?.message || wacMotorsportsEvents.reason);
+        }
+        if (alanGuloEvents.status === 'rejected') {
+            console.error('AlanGuloTV falló:', alanGuloEvents.reason?.message || alanGuloEvents.reason);
+        }
 
         const allEvents = [...wearecheckingMotorsportsEvents, ...newAlanGuloEvents];
-        console.log(`Total eventos combinados: ${allEvents.length}`);
+        console.log(`Total eventos obtenidos: WAC=${wearecheckingMotorsportsEvents.length}, AlanGulo=${newAlanGuloEvents.length}, Total=${allEvents.length}`);
         
         if (allEvents.length === 0) {
             console.warn('No se obtuvieron eventos de ninguna fuente');
             return res.status(200).json([]);
         }
         
+        // Deduplicación y formateo
         const eventMap = new Map();
         allEvents.forEach(event => {
             if (!event || !event.title) return;
 
-            const key = `${event.title || 'Sin título'}__${event.time || '-'}__${event.source}`;
+            const key = `${event.title}__${event.time}__${event.source}`;
             if (!eventMap.has(key)) {
                 let buttonArr = [];
                 let optionsArr = [];
-                if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
+                
+                if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options)) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
                 } else if (event.source === 'alangulotv') {
-                    buttonArr = event.buttons;
-                    optionsArr = event.options;
+                    buttonArr = event.buttons || [];
+                    optionsArr = event.options || [];
                 }
+                
                 eventMap.set(key, {
                     time: event.time || '-',
                     title: event.title || 'Sin título',
@@ -373,35 +413,19 @@ export default async (req, res) => {
                     language: event.language || 'Desconocido',
                     date: event.date || new Date().toISOString().split('T')[0],
                     source: event.source || 'unknown',
-                    image: event.image || '',
+                    image: event.image || DEFAULT_IMAGE,
                     status: event.status || 'Desconocido'
                 });
-            } else {
-                const existing = eventMap.get(key);
-                if ((event.source === 'wearechecking-motorsports' || event.source === 'alangulotv') && Array.isArray(event.options)) {
-                    event.options.forEach(opt => {
-                        const link = opt.link || opt;
-                        if (!existing.options.includes(link)) {
-                            existing.options.push(link);
-                            existing.buttons.push((opt.name || 'CANAL').toUpperCase());
-                        }
-                    });
-                }
             }
         });
 
-        let adaptedEvents = Array.from(eventMap.values());
+        const adaptedEvents = Array.from(eventMap.values());
         
-        adaptedEvents = adaptedEvents.map(event => {
-            if (!event.image) {
-                event.image = DEFAULT_IMAGE;
-            }
-            return event;
-        });
-        
+        console.log(`Enviando ${adaptedEvents.length} eventos únicos`);
         return res.status(200).json(adaptedEvents);
+        
     } catch (error) {
         console.error('Error en la función principal:', error);
-        return res.status(500).json({ error: 'Error interno del servidor' });
+        return res.status(500).json({ error: 'Error interno del servidor', details: error.message });
     }
 };
