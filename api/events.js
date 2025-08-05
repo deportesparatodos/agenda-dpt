@@ -115,14 +115,8 @@ async function fetchAlanGuloTVEvents() {
         console.log('[AlanGuloTV] Iniciando Puppeteer con puppeteer-core...');
         
         browser = await puppeteer.launch({
-            // Añadimos banderas de compatibilidad para entornos restringidos como Vercel
-            args: [
-                ...chromium.args,
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--single-process'
-            ],
+            // Usamos directamente los argumentos recomendados por @sparticuz/chromium
+            args: chromium.args,
             defaultViewport: chromium.defaultViewport,
             executablePath: await chromium.executablePath(),
             headless: chromium.headless,
