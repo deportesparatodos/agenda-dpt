@@ -1,14 +1,14 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
-import fs from 'fs';
-import path from 'path';
-// Usar import para todos los paquetes, que es lo correcto para tu proyecto
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+// Importar explícitamente el plugin que causa el error
+import UserPreferencesPlugin from 'puppeteer-extra-plugin-user-preferences';
 
-// Aplicar el plugin de stealth para evitar bloqueos
+// Aplicar los plugins a puppeteer
 puppeteer.use(StealthPlugin());
+puppeteer.use(UserPreferencesPlugin()); // Usar el plugin explícitamente
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
@@ -63,11 +63,9 @@ async function fetchWeAreCheckingMotorsportsEvents() {
         const eventPromises = [];
         $('#streams-dynamic-container .stream-wrapper').each((i, el) => {
             const $wrapper = $(el);
-            // Extraer la imagen de la card actual
             const imageSrc = $wrapper.find('.stream-thumb').attr('src');
-            let imageUrl = DEFAULT_IMAGE; // Usar imagen por defecto como fallback
+            let imageUrl = DEFAULT_IMAGE;
             if (imageSrc) {
-                // Construir la URL absoluta
                 imageUrl = `https://wearechecking.online/${imageSrc.replace(/..[\\/]/, '')}`;
             }
 
@@ -95,7 +93,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                     language: 'Inglés',
                     date: new Date().toISOString().split('T')[0],
                     source: 'wearechecking-motorsports',
-                    image: imageUrl, // Usar la imagen de la card
+                    image: imageUrl,
                     options: []
                 };
                 const p = fetchWACLinksForEvent(link).then(options => {
@@ -127,7 +125,7 @@ async function fetchAlanGuloTVEvents() {
             args: isVercel ? chromium.args : [],
             defaultViewport: chromium.defaultViewport,
             executablePath: isVercel ? await chromium.executablePath() : undefined,
-            headless: isVercel ? chromium.headless : false, // 'new' para local, chromium.headless para Vercel
+            headless: isVercel ? chromium.headless : false,
             ignoreHTTPSErrors: true,
         });
 
@@ -137,16 +135,14 @@ async function fetchAlanGuloTVEvents() {
         
         await page.goto(agendaUrl, { waitUntil: 'domcontentloaded', timeout: 40000 });
 
-        // Espera robusta para el contenido dinámico
         await page.waitForSelector('.match-container', { timeout: 30000 });
         console.log('[AlanGuloTV] Contenedores de partidos iniciales encontrados.');
 
-        // Espera adicional para que los scripts de la página terminen de ejecutarse
         await page.evaluate(() => {
             return new Promise(resolve => {
                 const checkContentLoaded = () => {
                     const scroller = document.querySelector('.agenda-scroller');
-                    if (scroller && scroller.children.length > 5) { // Asumimos que más de 5 elementos significa que cargó
+                    if (scroller && scroller.children.length > 5) {
                         resolve();
                     } else {
                         setTimeout(checkContentLoaded, 500);
