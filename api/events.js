@@ -113,42 +113,60 @@ async function fetchAlanGuloTVEvents() {
     let browser = null;
     try {
         console.log('[AlanGuloTV] Iniciando Puppeteer con puppeteer-core...');
+        console.log('[AlanGuloTV] Variables de entorno:', {
+            VERCEL: process.env.VERCEL,
+            AWS_LAMBDA_FUNCTION_VERSION: process.env.AWS_LAMBDA_FUNCTION_VERSION,
+            AWS_EXECUTION_ENV: process.env.AWS_EXECUTION_ENV
+        });
         
-        // Configuración corregida para Vercel
-        const browserOptions = {
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-features=TranslateUI',
-                '--disable-ipc-flooding-protection'
-            ],
-            defaultViewport: {
-                width: 1280,
-                height: 720,
-            },
+        // Configuración base para el navegador
+        let browserOptions = {
             headless: true,
             ignoreHTTPSErrors: true,
         };
 
-        // Configurar el ejecutable de Chromium según el entorno
-        if (process.env.AWS_LAMBDA_FUNCTION_VERSION) {
-            // Estamos en Vercel/Lambda
-            browserOptions.executablePath = await chromium.executablePath;
-            browserOptions.args.push(...chromium.args);
+        // Configurar según el entorno
+        const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION || process.env.AWS_EXECUTION_ENV;
+        
+        if (isServerless) {
+            console.log('[AlanGuloTV] Configurando para entorno serverless (Vercel/Lambda)');
+            
+            // Usar configuración de @sparticuz/chromium
+            browserOptions = {
+                ...browserOptions,
+                args: [
+                    ...chromium.args,
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--single-process'
+                ],
+                defaultViewport: chromium.defaultViewport,
+                executablePath: await chromium.executablePath,
+                headless: chromium.headless,
+            };
         } else {
-            // Entorno local - usar Chromium del sistema
-            browserOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || 
-                '/usr/bin/google-chrome-stable' || 
-                '/usr/bin/chromium-browser';
+            console.log('[AlanGuloTV] Configurando para entorno local');
+            
+            // Configuración para entorno local
+            browserOptions = {
+                ...browserOptions,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--disable-gpu'
+                ],
+                defaultViewport: {
+                    width: 1280,
+                    height: 720,
+                },
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 
+                    '/usr/bin/google-chrome-stable' || 
+                    '/usr/bin/chromium-browser'
+            };
         }
 
         console.log('[AlanGuloTV] Lanzando navegador con opciones:', JSON.stringify(browserOptions, null, 2));
