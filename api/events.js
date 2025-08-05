@@ -3,12 +3,14 @@ import * as cheerio from 'cheerio';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-// Importar explícitamente el plugin que causa el error
+// Importar explícitamente los plugins que causan error
 import UserPreferencesPlugin from 'puppeteer-extra-plugin-user-preferences';
+import UserDataDirPlugin from 'puppeteer-extra-plugin-user-data-dir';
 
 // Aplicar los plugins a puppeteer
 puppeteer.use(StealthPlugin());
-puppeteer.use(UserPreferencesPlugin()); // Usar el plugin explícitamente
+puppeteer.use(UserPreferencesPlugin());
+puppeteer.use(UserDataDirPlugin()); // Usar el nuevo plugin explícitamente
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/dHPWxr8/depete.jpg';
 
