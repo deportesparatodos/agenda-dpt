@@ -114,9 +114,18 @@ async function fetchAlanGuloTVEvents() {
     try {
         console.log('[AlanGuloTV] Iniciando Puppeteer con puppeteer-core...');
         
+        // Forzamos a Chromium a usar un directorio temporal escribible en Vercel
+        chromium.setHeadlessMode = true;
+        chromium.setGraphicsMode = false;
+
         browser = await puppeteer.launch({
-            // Usamos directamente los argumentos recomendados por @sparticuz/chromium
-            args: chromium.args,
+            args: [
+                ...chromium.args,
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--single-process'
+            ],
             defaultViewport: chromium.defaultViewport,
             executablePath: await chromium.executablePath(),
             headless: chromium.headless,
@@ -124,8 +133,7 @@ async function fetchAlanGuloTVEvents() {
         });
 
         const page = await browser.newPage();
-        // Añadimos un User-Agent para parecer un navegador normal
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36');
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36');
 
         const agendaUrl = 'https://alangulotv.blog/agenda-2/';
         console.log(`[AlanGuloTV] Navegando a ${agendaUrl}...`);
