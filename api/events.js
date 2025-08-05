@@ -115,6 +115,7 @@ async function fetchWeAreCheckingMotorsportsEvents() {
 
 /**
  * Obtiene eventos desde la página de AlanGuloTV usando Puppeteer.
+ * @returns {Promise<Array>} Una promesa que resuelve a un array de eventos.
  */
 async function fetchAlanGuloTVEvents() {
     let browser = null;
@@ -131,11 +132,12 @@ async function fetchAlanGuloTVEvents() {
         const page = await browser.newPage();
         const agendaUrl = 'https://alangulotv.blog/agenda-2/';
         console.log(`[AlanGuloTV] Navegando a ${agendaUrl}...`);
-        await page.goto(agendaUrl, { waitUntil: 'networkidle0', timeout: 25000 });
+        // Aumentamos el timeout y esperamos a que la red esté inactiva
+        await page.goto(agendaUrl, { waitUntil: 'networkidle0', timeout: 30000 });
 
-        // Esperar a que los contenedores de los partidos se carguen en la página
-        await page.waitForSelector('.match-container', { timeout: 15000 });
-        console.log('[AlanGuloTV] Contenedores de partidos encontrados.');
+        // Esperamos a que el contenedor principal de la agenda esté disponible
+        await page.waitForSelector('.agenda-scroller', { timeout: 20000 });
+        console.log('[AlanGuloTV] Contenedor de agenda encontrado.');
 
         const html = await page.content();
         await browser.close();
@@ -143,41 +145,87 @@ async function fetchAlanGuloTVEvents() {
 
         const $ = cheerio.load(html);
         const events = [];
-        
-        $('.match-container').each((index, element) => {
-            const $container = $(element);
-            const time = $container.find('.time').text().trim() || '-';
-            const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
-            let title = teamNames.length > 1 ? `${teamNames[0]} vs ${teamNames[1]}` : $container.text().replace(time, '').trim();
-            if (teamNames.length === 0 && title.includes('vs')) { // Caso especial sin .team-name
-                title = title.split('vs').map(t => t.trim()).join(' vs ');
+        let currentTitle = null;
+
+        // Iteramos sobre todos los hijos directos del contenedor de la agenda
+        $('.agenda-scroller > *').each((index, element) => {
+            const node = element;
+
+            // 1. Buscamos un nodo de comentario para extraer el título del partido
+            if (node.type === 'comment') {
+                const commentText = node.data.trim();
+                if (commentText.startsWith('Partido:')) {
+                    currentTitle = commentText.replace('Partido:', '').trim();
+                }
+                return; // Continuamos al siguiente elemento
             }
 
-            const linksContainer = $container.next('.links-container');
-            if (linksContainer.length > 0) {
-                linksContainer.find('a.link-button').each((i, linkEl) => {
-                    const $link = $(linkEl);
-                    const href = $link.attr('href');
-                    const buttonName = $link.text().trim();
-                    if (href) {
-                        events.push({
-                            time,
-                            title,
-                            options: [`https://alangulotv.blog${href}`], // Construir URL completa
-                            buttons: [buttonName],
-                            category: 'Otros',
-                            language: 'Español',
-                            date: new Date().toISOString().split('T')[0],
-                            source: 'alangulotv',
-                            image: $container.find('.team-logo').first().attr('src') || $container.find('.event-logo').attr('src') || '',
-                            status: time.toLowerCase().includes('en vivo') ? 'En vivo' : 'Desconocido'
-                        });
+            // 2. Si el nodo es un 'match-container', procesamos el evento
+            if (node.type === 'tag' && $(node).hasClass('match-container')) {
+                const $container = $(node);
+                
+                // --- Extracción del Título ---
+                let title = currentTitle; // Usar título del comentario si existe
+                if (!title) {
+                    // Como fallback, construimos el título a partir de los nombres de los equipos
+                    const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
+                    if (teamNames.length > 1) {
+                        title = `${teamNames[0]} vs ${teamNames[1]}`;
+                    } else {
+                        // Si no hay título de ninguna forma, lo omitimos para evitar eventos vacíos
+                        console.log('[AlanGuloTV] Omitiendo evento sin título claro.');
+                        currentTitle = null; // Reseteamos el título
+                        return; // Continuamos al siguiente elemento
                     }
-                });
+                }
+                
+                // --- Extracción de otros datos ---
+                const time = $container.find('.time').text().trim() || '-';
+                const image = $container.find('.team-logo').first().attr('src') || $container.find('.event-logo').attr('src') || DEFAULT_IMAGE;
+                const status = time.toLowerCase().includes('en vivo') ? 'En vivo' : 'Próximamente';
+
+                const options = [];
+                const buttons = [];
+
+                // El contenedor de enlaces es el hermano siguiente inmediato
+                const linksContainer = $container.next('.links-container');
+                if (linksContainer.length > 0) {
+                    linksContainer.find('a.link-button').each((i, linkEl) => {
+                        const $link = $(linkEl);
+                        const href = $link.attr('href');
+                        const buttonName = $link.text().trim();
+                        
+                        if (href) {
+                            // Aseguramos que la URL sea absoluta
+                            const fullUrl = href.startsWith('http') ? href : `https://alangulotv.space${href}`;
+                            options.push(fullUrl);
+                            buttons.push(buttonName);
+                        }
+                    });
+                }
+                
+                // Solo añadimos el evento si tiene al menos un canal/opción
+                if (options.length > 0) {
+                    events.push({
+                        time,
+                        title,
+                        options,
+                        buttons,
+                        category: 'Deportes', // Categoría más específica
+                        language: 'Español',
+                        date: new Date().toISOString().split('T')[0],
+                        source: 'alangulotv',
+                        image,
+                        status
+                    });
+                }
+
+                // Reseteamos el título para el próximo evento
+                currentTitle = null;
             }
         });
 
-        console.log(`AlanGuloTV: ${events.length} eventos procesados exitosamente.`);
+        console.log(`[AlanGuloTV] ${events.length} eventos procesados exitosamente.`);
         return events;
     } catch (error) {
         console.error('Error al obtener eventos de AlanGuloTV:', error.message);
@@ -234,9 +282,11 @@ export default async (req, res) => {
             if (!eventMap.has(key)) {
                 let buttonArr = [];
                 let optionsArr = [];
+                // Lógica para wearechecking-motorsports
                 if (event.source === 'wearechecking-motorsports' && Array.isArray(event.options) && event.options.length > 0) {
                     buttonArr = event.options.map(opt => (opt.name || 'CANAL').toUpperCase());
                     optionsArr = event.options.map(opt => opt.link);
+                // Lógica para alangulotv (ya viene procesado)
                 } else if (event.source === 'alangulotv') {
                     buttonArr = event.buttons;
                     optionsArr = event.options;
@@ -254,12 +304,14 @@ export default async (req, res) => {
                     status: event.status || 'Desconocido'
                 });
             } else {
+                // Esta lógica de merge es un fallback, aunque con la nueva función no debería ser necesaria para alangulotv
                 const existing = eventMap.get(key);
                 if ((event.source === 'wearechecking-motorsports' || event.source === 'alangulotv') && Array.isArray(event.options)) {
                     event.options.forEach(opt => {
-                        if (!existing.options.includes(opt.link)) {
-                            existing.options.push(opt.link);
-                            existing.buttons.push(opt.name.toUpperCase());
+                        const link = opt.link || opt; // El objeto puede ser {name, link} o solo el link
+                        if (!existing.options.includes(link)) {
+                            existing.options.push(link);
+                            existing.buttons.push((opt.name || 'CANAL').toUpperCase());
                         }
                     });
                 }
