@@ -74,9 +74,9 @@ async function fetchWeAreCheckingMotorsportsEvents() {
                 let title = $p.text().trim();
                 const $span = $p.find('.unix-timestamp');
                 if ($span.length) {
-                     let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
+                     let spanText = $span.text().replace(/ ￨ |\\|/g, '').trim();
                      time = spanText;
-                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
+                     title = $p.text().replace($span.text(), '').replace(/^\s* ￨ \s*/, '').replace(/^\s*\|\s*/, '').trim();
                 }
                 const eventObj = {
                     time,
@@ -114,100 +114,161 @@ async function fetchAlanGuloTVEvents() {
     try {
         console.log('[AlanGuloTV] Iniciando Puppeteer con puppeteer-core...');
         
-        // Forzamos a Chromium a usar un directorio temporal escribible en Vercel
-        chromium.setHeadlessMode = true;
-        chromium.setGraphicsMode = false;
-
-        browser = await puppeteer.launch({
+        // Configuración corregida para Vercel
+        const browserOptions = {
             args: [
-                ...chromium.args,
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--single-process'
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-features=TranslateUI',
+                '--disable-ipc-flooding-protection'
             ],
-            defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(),
-            headless: chromium.headless,
+            defaultViewport: {
+                width: 1280,
+                height: 720,
+            },
+            headless: true,
             ignoreHTTPSErrors: true,
-        });
+        };
+
+        // Configurar el ejecutable de Chromium según el entorno
+        if (process.env.AWS_LAMBDA_FUNCTION_VERSION) {
+            // Estamos en Vercel/Lambda
+            browserOptions.executablePath = await chromium.executablePath;
+            browserOptions.args.push(...chromium.args);
+        } else {
+            // Entorno local - usar Chromium del sistema
+            browserOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || 
+                '/usr/bin/google-chrome-stable' || 
+                '/usr/bin/chromium-browser';
+        }
+
+        console.log('[AlanGuloTV] Lanzando navegador con opciones:', JSON.stringify(browserOptions, null, 2));
+        
+        browser = await puppeteer.launch(browserOptions);
 
         const page = await browser.newPage();
+        
+        // Configurar el User-Agent y otros headers
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36');
+        
+        // Configurar timeout más largo
+        page.setDefaultTimeout(60000);
+        page.setDefaultNavigationTimeout(60000);
 
         const agendaUrl = 'https://alangulotv.blog/agenda-2/';
         console.log(`[AlanGuloTV] Navegando a ${agendaUrl}...`);
         
-        await page.goto(agendaUrl, { waitUntil: 'domcontentloaded', timeout: 40000 });
-
-        await page.waitForSelector('.match-container', { timeout: 30000 });
-        console.log('[AlanGuloTV] Contenedores de partidos iniciales encontrados.');
-
-        await page.evaluate(() => {
-            return new Promise(resolve => {
-                const checkContentLoaded = () => {
-                    const scroller = document.querySelector('.agenda-scroller');
-                    if (scroller && scroller.children.length > 5) {
-                        resolve();
-                    } else {
-                        setTimeout(checkContentLoaded, 500);
-                    }
-                };
-                checkContentLoaded();
-            });
+        // Navegar a la página con configuración mejorada
+        await page.goto(agendaUrl, { 
+            waitUntil: 'networkidle0', 
+            timeout: 60000 
         });
-        console.log('[AlanGuloTV] Contenido dinámico parece estar cargado.');
+
+        console.log('[AlanGuloTV] Página cargada, esperando contenido...');
+
+        // Esperar a que aparezcan los contenedores de partidos
+        try {
+            await page.waitForSelector('.match-container', { timeout: 30000 });
+            console.log('[AlanGuloTV] Contenedores de partidos encontrados.');
+        } catch (e) {
+            console.log('[AlanGuloTV] No se encontraron contenedores .match-container, intentando alternativa...');
+            // Intentar con un selector más genérico
+            await page.waitForSelector('.agenda-scroller', { timeout: 30000 });
+        }
+
+        // Esperar a que el contenido dinámico se cargue completamente
+        await page.waitForFunction(() => {
+            const scroller = document.querySelector('.agenda-scroller');
+            return scroller && scroller.children.length > 0;
+        }, { timeout: 30000 });
+
+        console.log('[AlanGuloTV] Contenido dinámico cargado, extrayendo HTML...');
 
         const html = await page.content();
-        console.log('[AlanGuloTV] HTML obtenido, cerrando navegador...');
+        console.log(`[AlanGuloTV] HTML extraído (${html.length} caracteres), cerrando navegador...`);
+        
         await browser.close();
-        console.log('[AlanGuloTV] Navegador cerrado. Procesando HTML.');
+        browser = null;
+        
+        console.log('[AlanGuloTV] Navegador cerrado. Procesando HTML con Cheerio...');
 
         const $ = cheerio.load(html);
         const events = [];
         let currentTitle = null;
 
+        // Procesar todos los elementos en el scroller de agenda
         $('.agenda-scroller > *').each((index, element) => {
             const node = element;
 
+            // Procesar comentarios HTML que contienen información de partidos
             if (node.type === 'comment') {
                 const commentText = node.data.trim();
                 if (commentText.startsWith('Partido:')) {
                     currentTitle = commentText.replace('Partido:', '').trim();
+                    console.log(`[AlanGuloTV] Encontrado título en comentario: ${currentTitle}`);
                 }
                 return;
             }
 
+            // Procesar contenedores de partidos
             if (node.type === 'tag' && $(node).hasClass('match-container')) {
                 const $container = $(node);
                 
                 let title = currentTitle;
                 if (!title) {
+                    // Fallback: extraer título de los nombres de equipos
                     const teamNames = $container.find('.team-name').map((i, el) => $(el).text().trim()).get();
-                    if (teamNames.length > 1) {
+                    if (teamNames.length >= 2) {
                         title = `${teamNames[0]} vs ${teamNames[1]}`;
                     } else {
-                        console.log('[AlanGuloTV] Omitiendo evento sin título claro.');
-                        currentTitle = null;
-                        return;
+                        // Intentar obtener título de otros elementos
+                        const eventTitle = $container.find('.event-title, .match-title, h3, h4').first().text().trim();
+                        title = eventTitle || 'Evento sin título';
                     }
                 }
                 
-                const time = $container.find('.time').text().trim() || '-';
-                const image = $container.find('.team-logo').first().attr('src') || $container.find('.event-logo').attr('src') || DEFAULT_IMAGE;
+                const time = $container.find('.time, .match-time, .event-time').text().trim() || '-';
+                const image = $container.find('.team-logo, .event-logo, img').first().attr('src') || DEFAULT_IMAGE;
                 const status = time.toLowerCase().includes('en vivo') ? 'En vivo' : 'Próximamente';
 
                 const options = [];
                 const buttons = [];
 
-                const linksContainer = $container.next('.links-container');
+                // Buscar enlaces en el contenedor actual o en el siguiente
+                let linksContainer = $container.find('.links-container');
+                if (linksContainer.length === 0) {
+                    linksContainer = $container.next('.links-container');
+                }
+
                 if (linksContainer.length > 0) {
-                    linksContainer.find('a.link-button').each((i, linkEl) => {
+                    linksContainer.find('a.link-button, a[href]').each((i, linkEl) => {
                         const $link = $(linkEl);
                         const href = $link.attr('href');
-                        const buttonName = $link.text().trim();
+                        const buttonName = $link.text().trim() || `Canal ${i + 1}`;
                         
-                        if (href) {
+                        if (href && href !== '#') {
+                            const fullUrl = href.startsWith('http') ? href : `https://alangulotv.space${href}`;
+                            options.push(fullUrl);
+                            buttons.push(buttonName);
+                        }
+                    });
+                } else {
+                    // Buscar enlaces directamente en el contenedor
+                    $container.find('a[href]').each((i, linkEl) => {
+                        const $link = $(linkEl);
+                        const href = $link.attr('href');
+                        const buttonName = $link.text().trim() || `Canal ${i + 1}`;
+                        
+                        if (href && href !== '#' && !href.includes('javascript:')) {
                             const fullUrl = href.startsWith('http') ? href : `https://alangulotv.space${href}`;
                             options.push(fullUrl);
                             buttons.push(buttonName);
@@ -215,7 +276,7 @@ async function fetchAlanGuloTVEvents() {
                     });
                 }
                 
-                if (options.length > 0) {
+                if (title && title !== 'Evento sin título') {
                     events.push({
                         time,
                         title,
@@ -228,20 +289,31 @@ async function fetchAlanGuloTVEvents() {
                         image,
                         status
                     });
+                    
+                    console.log(`[AlanGuloTV] Evento procesado: ${title} - ${options.length} enlaces`);
                 }
+                
                 currentTitle = null;
             }
         });
 
         console.log(`[AlanGuloTV] ${events.length} eventos procesados exitosamente.`);
+        
         if (events.length === 0) {
-            console.warn("[AlanGuloTV] No se extrajo ningún evento. El HTML podría estar vacío o la estructura cambió.");
+            console.warn("[AlanGuloTV] No se extrajo ningún evento. Guardando HTML de muestra para debug...");
+            console.log("[AlanGuloTV] Muestra de HTML:", html.substring(0, 1000) + "...");
         }
+        
         return events;
+        
     } catch (error) {
         console.error('Error detallado en fetchAlanGuloTVEvents:', error);
         if (browser) {
-            await browser.close();
+            try {
+                await browser.close();
+            } catch (closeError) {
+                console.error('Error cerrando navegador:', closeError);
+            }
         }
         return [];
     }
